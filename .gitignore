@@ -1,0 +1,13 @@
+/target
+/editors/zed-oneway/target
+/editors/zed-oneway/extension.wasm
+/editors/zed-oneway/grammars/oneway.wasm
+/editors/zed-oneway/grammars/oneway
+/editors/zed-oneway/Cargo.lock
+/editors/tree-sitter-oneway/node_modules
+/editors/tree-sitter-oneway/build
+/editors/tree-sitter-oneway/bindings
+/editors/tree-sitter-oneway/target
+*.rs.bk
+*.o
+examples/*.rs

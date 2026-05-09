@@ -1,0 +1,14 @@
+id = "oneway"
+name = "Oneway"
+version = "0.1.0"
+schema_version = 1
+authors = ["Oneway Contributors"]
+description = "Oneway language support for Zed"
+
+[language_servers.oneway-lsp]
+name = "Oneway LSP"
+languages = ["Oneway"]
+
+[grammars.oneway]
+repository = "https://github.com/Almaju/tree-sitter-oneway"
+commit = "2a3b30c42ee9edbbb2d8fc1fb90a1085b1fda4da"

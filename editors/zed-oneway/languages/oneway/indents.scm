@@ -1,0 +1,5 @@
+(block "{" @indent "}" @outdent)
+(struct_declaration "{" @indent "}" @outdent)
+(enum_declaration "{" @indent "}" @outdent)
+(contract_declaration "{" @indent "}" @outdent)
+(match_expression "{" @indent "}" @outdent)

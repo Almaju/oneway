@@ -1,4 +1,5 @@
 /target
+/oneway-lints/target
 /editors/zed-oneway/target
 /editors/zed-oneway/extension.wasm
 /editors/zed-oneway/grammars/oneway.wasm

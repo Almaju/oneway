@@ -130,6 +130,15 @@ fmt:
 clippy:
     cargo clippy -- -W warnings
 
+# Run oneway-lints on the compiler codebase
+lint:
+    #!/usr/bin/env sh
+    pushd oneway-lints && cargo build 2>/dev/null && popd
+    TOOLCHAIN=$(pushd oneway-lints && rustup show active-toolchain | cut -d' ' -f1 && popd)
+    LIB="oneway-lints/target/debug/liboneway_lints@${TOOLCHAIN}.dylib"
+    cp "oneway-lints/target/debug/liboneway_lints.dylib" "${LIB}" 2>/dev/null || true
+    DYLINT_LIBRARY_PATH="$(pwd)/oneway-lints/target/debug" cargo dylint --all
+
 # Clean build artifacts + compiled examples
 clean:
     cargo clean

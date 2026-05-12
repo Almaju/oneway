@@ -59,8 +59,8 @@ The "Tool" column on every rule below tells you which one fires. `cargo oneway` 
 
 | Lint | Severity | Tool | One-liner |
 |------|----------|------|-----------|
-| [`raw_primitive_field`](docs/raw_primitive_field.md) | warn | dylint (planned) | Use newtypes for struct fields |
-| [`raw_primitive_param`](docs/raw_primitive_param.md) | warn | dylint (planned) | Use newtypes for function params |
+| [`raw_primitive_field`](docs/raw_primitive_field.md) | warn | dylint | Use newtypes for struct fields |
+| [`raw_primitive_param`](docs/raw_primitive_param.md) | warn | dylint | Use newtypes for function params |
 
 ## Error Handling
 
@@ -93,7 +93,7 @@ The "Tool" column on every rule below tells you which one fires. `cargo oneway` 
 
 | Lint | Severity | Tool | One-liner |
 |------|----------|------|-----------|
-| [`one_public_type_per_file`](docs/one_public_type_per_file.md) | warn | dylint (planned) | One primary pub type per file |
+| [`one_public_type_per_file`](docs/one_public_type_per_file.md) | warn | dylint | One primary pub type per file |
 
 ## Imports & Style
 
@@ -101,7 +101,7 @@ The "Tool" column on every rule below tells you which one fires. `cargo oneway` 
 |------|----------|------|-----------|
 | [`no_glob_imports`](docs/no_glob_imports.md) | deny | `clippy::wildcard_imports` | No `use foo::*` — name every import |
 | [`inline_format_args`](docs/inline_format_args.md) | deny | `clippy::uninlined_format_args` | `format!("{x}")` not `format!("{}", x)` |
-| [`no_turbofish`](docs/no_turbofish.md) | deny | dylint (planned) | Annotate the binding, not the call site |
+| [`no_turbofish`](docs/no_turbofish.md) | deny | dylint | Annotate the binding, not the call site |
 | [`prefer_combinators`](docs/prefer_combinators.md) | warn | `clippy::single_match` + `manual_map` + `manual_unwrap_or` | `.map()` / `.unwrap_or()` over `match` on Option/Result |
 
 ## Documentation

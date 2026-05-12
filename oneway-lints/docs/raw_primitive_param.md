@@ -1,7 +1,7 @@
 # `oneway::raw_primitive_param`
 
 **Severity:** warn
-**Enforced by:** `oneway_lints` (dylint) — *not yet implemented*
+**Enforced by:** `oneway_lints` (dylint)
 
 Function parameters should use newtypes instead of raw primitives. This prevents accidentally swapping arguments of the same primitive type at the call site.
 

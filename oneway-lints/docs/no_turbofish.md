@@ -1,7 +1,7 @@
 # `oneway::no_turbofish`
 
 **Severity:** deny
-**Enforced by:** `oneway_lints` (dylint) — *not yet implemented*
+**Enforced by:** `oneway_lints` (dylint)
 
 Don't use turbofish syntax (`::<>`). Annotate the binding instead — it's easier to read and easier to skim.
 

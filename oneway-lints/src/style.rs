@@ -4,6 +4,53 @@ use rustc_session::{declare_lint, impl_lint_pass};
 use rustc_span::{BytePos, FileName, Span};
 
 // ---------------------------------------------------------------------------
+// NO_TURBOFISH
+// ---------------------------------------------------------------------------
+
+declare_lint! {
+    /// **Deny** — don't use turbofish syntax (`::<>`). Annotate the binding's
+    /// type instead.
+    pub NO_TURBOFISH,
+    Deny,
+    "don't use turbofish syntax — annotate the binding instead"
+}
+
+pub struct NoTurbofish;
+impl_lint_pass!(NoTurbofish => [NO_TURBOFISH]);
+
+impl EarlyLintPass for NoTurbofish {
+    fn check_expr(&mut self, cx: &EarlyContext<'_>, expr: &ast::Expr) {
+        if expr.span.from_expansion() {
+            return;
+        }
+        match &expr.kind {
+            ast::ExprKind::MethodCall(method) => {
+                if method.seg.args.is_some() {
+                    cx.opt_span_lint(NO_TURBOFISH, Some(method.seg.span()), |diag| {
+                        diag.primary_message(
+                            "turbofish (`::<>`) — annotate the binding's type instead",
+                        );
+                    });
+                }
+            }
+            ast::ExprKind::Path(_, path) => {
+                for seg in &path.segments {
+                    if seg.args.is_some() {
+                        cx.opt_span_lint(NO_TURBOFISH, Some(seg.span()), |diag| {
+                            diag.primary_message(
+                                "turbofish (`::<>`) — annotate the binding's type instead",
+                            );
+                        });
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // NO_COMMENTS
 // ---------------------------------------------------------------------------
 

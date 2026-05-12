@@ -112,15 +112,20 @@ fn run_dylint(_passthrough: &[String], fix: bool) -> io::Result<i32> {
     if fix {
         cmd.arg("--fix");
     }
+    // `--path` discovers the lib via the target workspace's metadata, so
+    // `--lib` is redundant there; passing both conflicts with the internal
+    // `--lib` + `--all` check that strict mode (`--fix`) enforces. `--git`
+    // mode points at the whole oneway repo, which has more than one
+    // package, so `--lib` is required there to disambiguate.
     match env::var(LINTS_PATH_ENV) {
         Ok(path) if !path.is_empty() => {
             cmd.arg("--path").arg(path);
         }
         _ => {
             cmd.arg("--git").arg(DYLINT_GIT).arg("--pattern").arg(DYLINT_PATTERN);
+            cmd.arg("--lib").arg(DYLINT_LIB);
         }
     }
-    cmd.arg("--lib").arg(DYLINT_LIB);
     if fix {
         cmd.arg("--").arg("--allow-dirty").arg("--allow-staged");
     }

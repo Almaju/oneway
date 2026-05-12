@@ -1,7 +1,7 @@
 # `oneway::one_public_type_per_file`
 
 **Severity:** warn
-**Enforced by:** `oneway_lints` (dylint) — *not yet implemented*
+**Enforced by:** `oneway_lints` (dylint)
 
 Each file should export at most one primary public type (struct/enum). Related types (newtypes, error types) are fine as supporting cast.
 

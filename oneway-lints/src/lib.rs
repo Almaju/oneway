@@ -10,6 +10,8 @@ dylint_linting::dylint_library!();
 
 mod control_flow;
 mod functions;
+mod organization;
+mod primitives;
 mod sorting;
 mod style;
 
@@ -42,6 +44,17 @@ pub fn register_lints(_sess: &rustc_session::Session, lint_store: &mut rustc_lin
     lint_store.register_early_pass(|| Box::new(control_flow::NoLoop));
     lint_store.register_early_pass(|| Box::new(control_flow::NoIfElse));
 
-    lint_store.register_lints(&[style::NO_COMMENTS]);
+    lint_store.register_lints(&[style::NO_COMMENTS, style::NO_TURBOFISH]);
     lint_store.register_early_pass(|| Box::new(style::NoComments));
+    lint_store.register_early_pass(|| Box::new(style::NoTurbofish));
+
+    lint_store.register_lints(&[
+        primitives::RAW_PRIMITIVE_FIELD,
+        primitives::RAW_PRIMITIVE_PARAM,
+    ]);
+    lint_store.register_early_pass(|| Box::new(primitives::RawPrimitiveField));
+    lint_store.register_early_pass(|| Box::new(primitives::RawPrimitiveParam));
+
+    lint_store.register_lints(&[organization::ONE_PUBLIC_TYPE_PER_FILE]);
+    lint_store.register_early_pass(|| Box::new(organization::OnePublicTypePerFile::default()));
 }

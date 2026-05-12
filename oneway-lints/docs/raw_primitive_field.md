@@ -1,7 +1,7 @@
 # `oneway::raw_primitive_field`
 
 **Severity:** warn
-**Enforced by:** `oneway_lints` (dylint) — *not yet implemented*
+**Enforced by:** `oneway_lints` (dylint)
 
 Struct fields should use newtypes instead of raw primitives (`i32`, `i64`, `u64`, `f64`, `String`, `bool`).
 

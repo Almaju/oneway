@@ -35,19 +35,3 @@ impl EarlyLintPass for NoIfElse {
     // TODO: implement check_expr (detect ExprKind::If with else branch)
 }
 
-// ---------------------------------------------------------------------------
-// NO_EXPLICIT_RETURN
-// ---------------------------------------------------------------------------
-
-declare_lint! {
-    /// **Warn** — don't use explicit `return` when the last expression suffices.
-    pub NO_EXPLICIT_RETURN,
-    Warn,
-    "don't use explicit return when the last expression suffices"
-}
-
-pub struct NoExplicitReturn;
-impl_lint_pass!(NoExplicitReturn => [NO_EXPLICIT_RETURN]);
-impl EarlyLintPass for NoExplicitReturn {
-    // TODO: implement check_expr (detect ExprKind::Ret in tail position)
-}

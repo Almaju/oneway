@@ -82,15 +82,13 @@ The "Tool" column on every rule below tells you which one fires. `cargo oneway` 
 | Lint | Severity | Tool | One-liner |
 |------|----------|------|-----------|
 | [`no_explicit_return`](docs/no_explicit_return.md) | warn | `clippy::needless_return` | Last expression is the return value |
-| [`no_early_return_in_match`](docs/no_early_return_in_match.md) | warn | dylint (planned) | Let match be the return expression |
 
 ## Construction & Naming
 
 | Lint | Severity | Tool | One-liner |
 |------|----------|------|-----------|
 | [`no_builder_pattern`](docs/no_builder_pattern.md) | warn | dylint (planned) | Use struct literals, not builders |
-| [`type_derived_naming`](docs/type_derived_naming.md) | deny | dylint (planned) | Variable name must be snake_case of its type |
-| [`inconsistent_naming`](docs/inconsistent_naming.md) | warn | dylint (planned) | Param names should match their type |
+| [`type_derived_naming`](docs/type_derived_naming.md) | deny | dylint (planned) | Every binding's name must be snake_case of its type (let-bindings and params) |
 
 ## Module Organization
 

@@ -3,9 +3,11 @@
 **Severity:** deny
 **Enforced by:** `oneway_lints` (dylint) — *not yet implemented*
 
-Variable names must be the `snake_case` version of their type name. This eliminates bikeshedding and makes every binding instantly recognizable at the call site. When multiple variables of the same type coexist, add a descriptive prefix.
+Every binding's name must be the `snake_case` version of its type. This applies to both `let` bindings and function parameters — wherever you give a value a name, that name should echo the type.
 
-## ❌ Bad
+The reason: at every use site, the reader can map the variable back to its type without scrolling up to the declaration. It also eliminates bikeshedding ("`id` or `uid` or `user_id`?" — only one answer). When two bindings of the same type need to coexist, add a descriptive prefix.
+
+## ❌ Bad — short, type-unrelated names
 
 ```rust
 let id = UserId(42);
@@ -19,6 +21,22 @@ let u = User::find(id);
 let user_id = UserId(42);
 let database = Database::connect();
 let user = User::find(user_id);
+```
+
+## ❌ Bad — function parameter doesn't echo its type
+
+```rust
+fn find_user(id: UserId, db: &Database) -> Option<User> {
+    db.query(id)
+}
+```
+
+## ✅ Good
+
+```rust
+fn find_user(user_id: UserId, database: &Database) -> Option<User> {
+    database.query(user_id)
+}
 ```
 
 ## ❌ Bad — two of the same type without disambiguation

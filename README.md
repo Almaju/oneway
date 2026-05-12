@@ -18,11 +18,11 @@ See [`DESIGN.md`](DESIGN.md) for the full language specification.
 | Path | Description |
 |------|-------------|
 | [`src/`](src/) | The `oneway` compiler (lexer, parser, checker, codegen) and `oneway-lsp` server |
-| [`oneway-lints/`](oneway-lints/) | Standalone [dylint](https://github.com/trailofbits/dylint) library applying Oneway's philosophy to plain Rust |
-| [`cargo-oneway/`](cargo-oneway/) | `cargo oneway` — one-command runner for rustfmt + clippy + `oneway-lints` |
 | [`examples/`](examples/) | Example `.ow` programs |
 | [`editors/`](editors/) | Tree-sitter grammar and Zed extension |
 | [`DESIGN.md`](DESIGN.md) | Language design document |
+
+The Oneway-philosophy Rust lint suite and the `cargo oneway` runner now live in their own repo: **[Almaju/oneway-lints](https://github.com/Almaju/oneway-lints)**. Install with `cargo install cargo-oneway`.
 
 ---
 

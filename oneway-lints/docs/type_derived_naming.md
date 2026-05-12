@@ -1,7 +1,11 @@
 # `oneway::type_derived_naming`
 
 **Severity:** deny
-**Enforced by:** `oneway_lints` (dylint) — *not yet implemented*
+**Enforced by:** `oneway_lints` (dylint)
+
+The implementation enforces this for function parameters and `let` bindings with an explicit type ascription. For inferred types, the rule is not enforced today — add `: Type` to opt the binding in.
+
+**Exemptions:** primitives (`i32`, `bool`, `String`, …) and a handful of stdlib containers whose idiomatic short names are too entrenched to flag (`Option`, `Result`, `Vec`, `Box`, `Rc`, `Arc`, `HashMap`, `Path`, …). Use whatever name you like for those.
 
 Every binding's name must be the `snake_case` version of its type. This applies to both `let` bindings and function parameters — wherever you give a value a name, that name should echo the type.
 

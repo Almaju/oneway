@@ -10,6 +10,7 @@ dylint_linting::dylint_library!();
 
 mod control_flow;
 mod functions;
+mod naming;
 mod organization;
 mod primitives;
 mod sorting;
@@ -57,4 +58,7 @@ pub fn register_lints(_sess: &rustc_session::Session, lint_store: &mut rustc_lin
 
     lint_store.register_lints(&[organization::ONE_PUBLIC_TYPE_PER_FILE]);
     lint_store.register_early_pass(|| Box::new(organization::OnePublicTypePerFile::default()));
+
+    lint_store.register_lints(&[naming::TYPE_DERIVED_NAMING]);
+    lint_store.register_early_pass(|| Box::new(naming::TypeDerivedNaming));
 }

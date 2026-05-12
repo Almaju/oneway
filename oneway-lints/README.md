@@ -75,7 +75,6 @@ The "Tool" column on every rule below tells you which one fires. `cargo oneway` 
 |------|----------|------|-----------|
 | [`no_loop`](docs/no_loop.md) | deny | dylint | No `loop`/`while`/`for` — use iterators |
 | [`no_if_else`](docs/no_if_else.md) | warn | dylint | Use `match` instead of `if`/`else` chains |
-| [`prefer_functional_iteration`](docs/prefer_functional_iteration.md) | warn | `clippy::manual_filter_map` (partial) + dylint (planned) | Use `.iter().map().filter()` over manual loops |
 
 ## Return Style
 
@@ -87,7 +86,7 @@ The "Tool" column on every rule below tells you which one fires. `cargo oneway` 
 
 | Lint | Severity | Tool | One-liner |
 |------|----------|------|-----------|
-| [`type_derived_naming`](docs/type_derived_naming.md) | deny | dylint (planned) | Every binding's name must be snake_case of its type (let-bindings and params) |
+| [`type_derived_naming`](docs/type_derived_naming.md) | deny | dylint | Function params and ascribed `let` bindings — name must be snake_case of type |
 
 ## Module Organization
 

@@ -1,7 +1,7 @@
 # `oneway::no_loop`
 
 **Severity:** deny
-**Enforced by:** `oneway_lints` (dylint) — *not yet implemented*
+**Enforced by:** `oneway_lints` (dylint)
 
 Don't use `loop`, `while`, or `for` with manual iteration. Use iterators and functional combinators instead.
 

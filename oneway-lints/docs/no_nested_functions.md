@@ -1,7 +1,7 @@
 # `oneway::no_nested_functions`
 
 **Severity:** warn
-**Enforced by:** `oneway_lints` (dylint) — *not yet implemented*
+**Enforced by:** `oneway_lints` (dylint)
 
 Don't define functions inside other functions. Extract them to module level.
 

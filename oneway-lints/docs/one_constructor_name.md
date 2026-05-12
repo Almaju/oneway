@@ -1,7 +1,7 @@
 # `oneway::one_constructor_name`
 
 **Severity:** deny
-**Enforced by:** `oneway_lints` (dylint) — *not yet implemented*
+**Enforced by:** `oneway_lints` (dylint)
 
 Constructors must be named `new`. Not `create`, `build`, `init`, `make`, `construct`, or `from_*` (except `From` trait impls).
 

@@ -1,7 +1,7 @@
 # `oneway::no_if_else`
 
 **Severity:** warn
-**Enforced by:** `oneway_lints` (dylint) — *not yet implemented*
+**Enforced by:** `oneway_lints` (dylint)
 
 Prefer `match` over `if`/`else` chains. Match is more explicit, forces you to handle all cases (exhaustiveness checking), and the arms can be sorted ([`unsorted_match_arms`](unsorted_match_arms.md)).
 

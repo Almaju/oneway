@@ -52,8 +52,8 @@ The "Tool" column on every rule below tells you which one fires. `cargo oneway` 
 | Lint | Severity | Tool | One-liner |
 |------|----------|------|-----------|
 | [`too_many_params`](docs/too_many_params.md) | deny | `clippy::too_many_arguments` (threshold = 2) | Max 2 params: self + one input |
-| [`no_nested_functions`](docs/no_nested_functions.md) | warn | dylint (planned) | Extract inner functions to module level |
-| [`one_constructor_name`](docs/one_constructor_name.md) | deny | dylint (planned) | Constructors must be called `new` |
+| [`no_nested_functions`](docs/no_nested_functions.md) | warn | dylint | Extract inner functions to module level |
+| [`one_constructor_name`](docs/one_constructor_name.md) | deny | dylint | Constructors must be called `new` |
 
 ## Newtype Discipline
 
@@ -73,8 +73,8 @@ The "Tool" column on every rule below tells you which one fires. `cargo oneway` 
 
 | Lint | Severity | Tool | One-liner |
 |------|----------|------|-----------|
-| [`no_loop`](docs/no_loop.md) | deny | dylint (planned) | No `loop`/`while`/`for` — use iterators |
-| [`no_if_else`](docs/no_if_else.md) | warn | dylint (planned) | Use `match` instead of `if`/`else` chains |
+| [`no_loop`](docs/no_loop.md) | deny | dylint | No `loop`/`while`/`for` — use iterators |
+| [`no_if_else`](docs/no_if_else.md) | warn | dylint | Use `match` instead of `if`/`else` chains |
 | [`prefer_functional_iteration`](docs/prefer_functional_iteration.md) | warn | `clippy::manual_filter_map` (partial) + dylint (planned) | Use `.iter().map().filter()` over manual loops |
 
 ## Return Style
@@ -83,11 +83,10 @@ The "Tool" column on every rule below tells you which one fires. `cargo oneway` 
 |------|----------|------|-----------|
 | [`no_explicit_return`](docs/no_explicit_return.md) | warn | `clippy::needless_return` | Last expression is the return value |
 
-## Construction & Naming
+## Naming
 
 | Lint | Severity | Tool | One-liner |
 |------|----------|------|-----------|
-| [`no_builder_pattern`](docs/no_builder_pattern.md) | warn | dylint (planned) | Use struct literals, not builders |
 | [`type_derived_naming`](docs/type_derived_naming.md) | deny | dylint (planned) | Every binding's name must be snake_case of its type (let-bindings and params) |
 
 ## Module Organization

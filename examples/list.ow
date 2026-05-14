@@ -1,0 +1,13 @@
+main = (Stdout) -> Noop {
+    List(1, 2, 3)
+        .length()
+        .print(Stdout)
+    List(10, 20, 30)
+        .map((Int) -> Int { Int.mul(2) })
+        .length()
+        .print(Stdout)
+    match List(7, 8, 9).first() {
+        None => "empty".print(Stdout),
+        Some(_) => "non-empty".print(Stdout),
+    }
+}

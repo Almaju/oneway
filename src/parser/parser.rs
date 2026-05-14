@@ -505,6 +505,7 @@ impl Parser {
         match tok.kind {
             TokenKind::KwMatch => self.parse_match(),
             TokenKind::KwWhile => self.parse_while(),
+            TokenKind::LParen => self.parse_lambda(),
             TokenKind::Ident | TokenKind::KwSelf => {
                 self.advance();
                 if self.check(TokenKind::LParen) {
@@ -584,6 +585,31 @@ impl Parser {
                 span: tok.span,
             }),
         }
+    }
+
+    fn parse_lambda(&mut self) -> Result<Expr> {
+        let lparen = self.expect(TokenKind::LParen, "expected `(` to begin lambda")?;
+        let mut params = Vec::new();
+        if !self.check(TokenKind::RParen) {
+            loop {
+                params.push(self.parse_param()?);
+                if self.check(TokenKind::Comma) {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+        }
+        self.expect(TokenKind::RParen, "expected `)` to close lambda parameter list")?;
+        self.expect(TokenKind::Arrow, "expected `->` after lambda parameter list")?;
+        let return_ty = self.parse_type_expr()?;
+        let body = self.parse_block()?;
+        Ok(Expr::Lambda {
+            params,
+            return_ty,
+            body,
+            span: span_join(lparen.span, self.previous_span()),
+        })
     }
 
     fn parse_while(&mut self) -> Result<Expr> {

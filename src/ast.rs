@@ -157,6 +157,12 @@ pub enum Expr {
         body: Block,
         span: Span,
     },
+    Lambda {
+        params: Vec<Param>,
+        return_ty: TypeExpr,
+        body: Block,
+        span: Span,
+    },
 }
 
 impl Expr {
@@ -172,6 +178,7 @@ impl Expr {
             Expr::Match { span, .. } => *span,
             Expr::Try { span, .. } => *span,
             Expr::While { span, .. } => *span,
+            Expr::Lambda { span, .. } => *span,
         }
     }
 }

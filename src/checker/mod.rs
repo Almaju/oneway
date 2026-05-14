@@ -541,6 +541,29 @@ fn check_expr(
                 check_expr(expr, scope, symbols, errors);
             }
         }
+        Expr::Lambda {
+            params,
+            return_ty,
+            body,
+            ..
+        } => {
+            let generic_scope: HashSet<String> = HashSet::new();
+            check_type_expr(return_ty, symbols, &generic_scope, errors);
+            for param in params {
+                check_type_expr(&param.ty, symbols, &generic_scope, errors);
+            }
+            let mut inner_scope = ExprScope {
+                names: scope.names.clone(),
+            };
+            for param in params {
+                if let Some(name) = param.ty.simple_name() {
+                    inner_scope.names.push(name.to_string());
+                }
+            }
+            for expr in &body.exprs {
+                check_expr(expr, &inner_scope, symbols, errors);
+            }
+        }
     }
 }
 
@@ -575,6 +598,11 @@ fn is_known_method(receiver_ty: &str, method: &str, arg_count: usize) -> bool {
     }
     if receiver_ty == "String" && method == "concat" && arg_count == 1 {
         return true;
+    }
+    if receiver_ty == "List" {
+        if matches!((method, arg_count), ("length", 0) | ("first", 0) | ("map", 1)) {
+            return true;
+        }
     }
     false
 }
@@ -624,6 +652,10 @@ fn expr_type_name_in_scope(expr: &Expr, symbols: &SymbolTable) -> String {
             "<unknown>".to_string()
         }
         Expr::While { .. } => "Noop".to_string(),
+        Expr::Lambda { return_ty, .. } => match return_ty {
+            TypeExpr::Named { name, .. } => name.clone(),
+            _ => "<unknown>".to_string(),
+        },
     }
 }
 
@@ -640,6 +672,9 @@ fn method_return_type(receiver_ty: &str, method: &str) -> String {
         ("Float", "eq" | "lt" | "gt" | "lte" | "gte") => "Bool".to_string(),
         ("Bool", "not" | "and" | "or") => "Bool".to_string(),
         ("String", "concat") => "String".to_string(),
+        ("List", "length") => "Int".to_string(),
+        ("List", "map") => "List".to_string(),
+        ("List", "first") => "Option".to_string(),
         _ => "<unknown>".to_string(),
     }
 }

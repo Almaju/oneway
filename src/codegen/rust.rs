@@ -67,6 +67,7 @@ struct Codegen {
     current_receiver: Option<String>,
     extern_methods: HashMap<(String, String), String>,
     bool_declared: bool,
+    lambda_scopes: std::cell::RefCell<Vec<HashMap<String, String>>>,
 }
 
 impl Codegen {
@@ -130,6 +131,7 @@ impl Codegen {
             current_receiver: None,
             extern_methods,
             bool_declared,
+            lambda_scopes: std::cell::RefCell::new(Vec::new()),
         }
     }
 
@@ -281,6 +283,15 @@ impl Codegen {
             Expr::Constructor { name, args, .. } => {
                 if is_primitive_constructor(&name.name) && args.len() == 1 {
                     self.emit_expr(out, &args[0]);
+                } else if name.name == "List" {
+                    out.push_str("vec![");
+                    for (i, arg) in args.iter().enumerate() {
+                        if i > 0 {
+                            out.push_str(", ");
+                        }
+                        self.emit_expr(out, arg);
+                    }
+                    out.push(']');
                 } else if is_stdlib_variant(&name.name) {
                     if args.is_empty() {
                         out.push_str(&name.name);
@@ -355,6 +366,36 @@ impl Codegen {
                 }
                 out.push_str("    }");
             }
+            Expr::Lambda {
+                params,
+                return_ty,
+                body,
+                ..
+            } => {
+                let mut scope = HashMap::new();
+                out.push('|');
+                for (i, param) in params.iter().enumerate() {
+                    if i > 0 {
+                        out.push_str(", ");
+                    }
+                    let arg = format!("__a{}", i);
+                    let _ = write!(out, "{}: {}", arg, render_type(&param.ty));
+                    if let Some(name) = param.ty.simple_name() {
+                        scope.insert(name.to_string(), arg);
+                    }
+                }
+                let _ = write!(out, "| -> {} {{ ", render_type(return_ty));
+                self.lambda_scopes.borrow_mut().push(scope);
+                let last_idx = body.exprs.len().saturating_sub(1);
+                for (i, expr) in body.exprs.iter().enumerate() {
+                    self.emit_expr(out, expr);
+                    if i != last_idx {
+                        out.push_str("; ");
+                    }
+                }
+                self.lambda_scopes.borrow_mut().pop();
+                out.push_str(" }");
+            }
         }
     }
 
@@ -396,6 +437,28 @@ impl Codegen {
             self.emit_expr(&mut s, &args[0]);
             s.push(')');
             return Some(s);
+        }
+        if static_type_of(receiver) == "List" {
+            if method.name == "length" && args.is_empty() {
+                let mut s = String::from("(");
+                self.emit_expr(&mut s, receiver);
+                s.push_str(".len() as i64)");
+                return Some(s);
+            }
+            if method.name == "first" && args.is_empty() {
+                let mut s = String::new();
+                self.emit_expr(&mut s, receiver);
+                s.push_str(".first().cloned()");
+                return Some(s);
+            }
+            if method.name == "map" && args.len() == 1 {
+                let mut s = String::new();
+                self.emit_expr(&mut s, receiver);
+                s.push_str(".into_iter().map(");
+                self.emit_expr(&mut s, &args[0]);
+                s.push_str(").collect::<Vec<_>>()");
+                return Some(s);
+            }
         }
         None
     }
@@ -470,6 +533,11 @@ impl Codegen {
         if name == "Self" {
             return "self".to_string();
         }
+        for scope in self.lambda_scopes.borrow().iter().rev() {
+            if let Some(arg) = scope.get(name) {
+                return arg.clone();
+            }
+        }
         if let Some(current) = &self.current_receiver {
             if name == current {
                 return "self".to_string();
@@ -520,6 +588,7 @@ fn render_named_type(name: &str, generics: &[TypeExpr]) -> String {
         "Bytes" => "Vec<u8>".to_string(),
         "String" => "String".to_string(),
         "Bool" => "bool".to_string(),
+        "List" => "Vec".to_string(),
         other => other.to_string(),
     };
     if generics.is_empty() {
@@ -576,8 +645,29 @@ fn static_type_of(expr: &Expr) -> String {
         Expr::HexLit { .. } => "Hex".to_string(),
         Expr::Constructor { name, .. } => name.name.clone(),
         Expr::Ident(ident) => ident.name.clone(),
-        Expr::MethodCall { .. } | Expr::Match { .. } | Expr::Try { .. } | Expr::While { .. } => {
+        Expr::MethodCall {
+            receiver, method, ..
+        } => {
+            let recv_ty = static_type_of(receiver);
+            match (recv_ty.as_str(), method.name.as_str()) {
+                ("List", "map") => "List".to_string(),
+                ("List", "length") => "Int".to_string(),
+                ("List", "first") => "Option".to_string(),
+                ("Int" | "Float", "add" | "sub" | "mul" | "div" | "rem") => recv_ty,
+                ("Int" | "Float", "eq" | "lt" | "gt" | "lte" | "gte") => "Bool".to_string(),
+                ("Bool", "not" | "and" | "or") => "Bool".to_string(),
+                ("String", "concat") => "String".to_string(),
+                _ => "<unknown>".to_string(),
+            }
+        }
+        Expr::Try { inner, .. } => {
+            if let Expr::Constructor { name, args, .. } = &**inner {
+                if matches!(name.name.as_str(), "Ok" | "Some") && !args.is_empty() {
+                    return static_type_of(&args[0]);
+                }
+            }
             "<unknown>".to_string()
         }
+        Expr::Match { .. } | Expr::While { .. } | Expr::Lambda { .. } => "<unknown>".to_string(),
     }
 }

@@ -68,9 +68,17 @@ There are no comments. Code must speak for itself through types and naming.
 If you find yourself wanting to write a comment, the right answer is
 usually to introduce a newtype or rename a method.
 
-## Small Core, Big Ecosystem
+## Batteries-Included
 
-Oneway ships almost nothing of its own beyond the type system and a handful
-of standard unions and containers. HTTP, JSON, databases, regex, logging —
-everything else is the host language's ecosystem (Rust + crates.io),
-reached via [`extern Rust`](./extern.md) declarations.
+Oneway ships opinionated binding packages for the major application
+domains — `HttpServer`, `HttpClient`, `Filesystem`, `Database`, `Json`,
+and more — each wrapping a chosen Rust crate. The user gets a single
+curated import per domain (`use HttpServer`, `use Filesystem`, …) without
+having to evaluate the Rust crate ecosystem. The community is free to
+publish additional bindings, but the headline batteries ship with the
+language.
+
+Under the hood, every binding is implemented in ordinary Oneway via
+[`extern Rust`](./extern.md) declarations over its underlying crate.
+There is no privileged path — anyone can write the same bindings;
+Oneway just ships them so users don't have to.

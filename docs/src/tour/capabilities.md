@@ -37,19 +37,69 @@ corresponding effect — it cannot even *call* something that does. Effects
 propagate through the type system: if `f` calls something needing
 `Stdout`, then `f` must take `Stdout` too.
 
+## Multiple Capabilities
+
+A function that needs several capabilities receives them as a single
+product-typed parameter — the same `&` that composes product types
+elsewhere in the language:
+
+```oneway
+use Filesystem
+
+main = (Filesystem & Stdout) -> Result<Noop, IoError> {
+    Filesystem.read(Path("Cargo.toml"))?.print(Stdout)
+    Ok(Noop)
+}
+```
+
+The components are accessed by their type names. The alphabetical-order
+rule that applies to product members also applies here:
+`(Filesystem & Stdout)` is valid; `(Stdout & Filesystem)` is a compile
+error.
+
 ## Built-In Capabilities
 
 The Oneway-owned core includes:
 
-| Capability     | Effect                       |
-|----------------|------------------------------|
-| `Clock`        | Read the current time        |
-| `Filesystem`   | Read and write files         |
-| `Network`      | Open network connections     |
-| `Random`       | Generate random values       |
-| `Stderr`       | Write to standard error      |
-| `Stdin`        | Read from standard input     |
-| `Stdout`       | Write to standard output     |
+| Capability     | Effect                       | Kind            |
+|----------------|------------------------------|-----------------|
+| `Clock`        | Read the current time        | non-suspending  |
+| `Filesystem`   | Read and write files         | suspending      |
+| `Network`      | Open network connections     | suspending      |
+| `Random`       | Generate random values       | non-suspending  |
+| `Stderr`       | Write to standard error      | non-suspending  |
+| `Stdin`        | Read from standard input     | non-suspending  |
+| `Stdout`       | Write to standard output     | non-suspending  |
+
+Binding packages add more capabilities of their own — `HttpClient`,
+`HttpServer` (suspending), `Json` (non-suspending), etc.
+
+## Suspending vs Non-Suspending
+
+Capabilities split into two kinds based on whether their effects can wait
+on the outside world:
+
+- **Non-suspending** capabilities (`Stdout`, `Clock`, `Random`, …) complete
+  without yielding to a scheduler.
+- **Suspending** capabilities (`Filesystem`, `Network`, …) may park the
+  caller while the OS or a remote system responds.
+
+A function compiles to `async fn` in Rust **if and only if** it
+transitively requires a suspending capability or calls an
+[`extern Rust.async`](extern.md#async-externs) item. Otherwise it compiles
+to a plain `fn`. `main` becomes `#[tokio::main]` only when the program is
+async-colored.
+
+This is invisible at the source level — Oneway has no `async` keyword and
+no `.await` — but it carries the "color" of a function through the type
+system. The capability parameter *is* the color. Pure-compute programs
+that take no suspending capability link no async runtime, pay no
+state-machine overhead, and produce small binaries.
+
+The propagation rule is the same as for any other capability: if you call
+something needing `Filesystem`, your function must declare `Filesystem`
+in its parameters. The compiler verifies; it does not infer the signature
+for you.
 
 ## Why Not Monads?
 

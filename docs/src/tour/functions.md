@@ -156,6 +156,29 @@ Numbers.tripleAll = () -> Numbers {
 Lambda syntax mirrors method declaration syntax: `(params) -> ReturnType
 { body }`. The only difference is the absence of a `Type.name =` prefix.
 
+## Generic Methods
+
+A method can be parameterized by a type. Declare type parameters with
+`<...>` before the parameter list, optionally with a trait constraint:
+
+```oneway
+List.print = <T: Print>() -> Noop {
+    ...
+}
+```
+
+When calling a generic method whose type parameter can't be inferred from
+context, pin it with `::<...>` (turbofish) after the method name:
+
+```oneway
+Json.parse::<List<Int>>("[1, 2, 3]")?
+```
+
+Turbofish is only required when the surrounding type context doesn't
+already determine the parameter. A function with an explicit
+`Result<List<Int>, _>` return type lets the compiler infer from the
+return position without an annotation.
+
 ## The `main` Function
 
 `main` is the single exception to "every function is on a type". It is a

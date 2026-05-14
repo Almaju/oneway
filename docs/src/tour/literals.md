@@ -65,3 +65,38 @@ red  = Hex(0xFF0000)
 `&` is overloaded across the two levels: at the type level it forms a
 product type, at the value level it forms a product value. The two never
 appear in the same context.
+
+## Validated Constructors (`Type.Self`)
+
+By default, a type's constructor is total: `T(inner)` always succeeds and
+returns `T`. For types whose construction can fail — a `Url` parsed from
+a `String`, an `Email` from a `String`, etc. — the fallibility belongs in
+the type system as `Result<T, E>`. Same principle the language already
+applies to "missing": `Option<T>`.
+
+A type opts into this by declaring a method named `Self`:
+
+```oneway
+Url = String
+
+extern Rust("oneway_url_parse")
+Url.Self = (String) -> Result<Url, InvalidUrl>
+```
+
+`Self` is the alias for the receiver type's name; `Type.Self` reads as
+"the constructor that produces a `Self`."
+
+When a type declares `Type.Self`, that *is* the constructor — the
+implicit total constructor is replaced. The signature is unconstrained:
+total (`(String) -> Url`), fallible (`Result<Url, InvalidUrl>`), or
+optional (`Option<Url>`). Call sites still use the ordinary constructor
+syntax `Url("https://example.com")`, but the expression's type is now
+whatever `Url.Self` returns, so a fallible constructor *forces* `?` (or
+`match`) at the call site:
+
+```oneway
+HttpClient.get(Url("https://example.com")?)?.print(Stdout)
+```
+
+External callers cannot bypass the constructor. The raw inner
+representation is only accessible inside the same file as the type.

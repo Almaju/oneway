@@ -25,16 +25,24 @@ So `foo.bar()?` is `((foo.bar)())?`.
 
 ## Glossary of Operators and Sigils
 
-| Symbol     | Meaning                                  |
-|------------|------------------------------------------|
-| `\|`       | Union                                    |
-| `&`        | Product                                  |
-| `Type[N]`  | Fixed repetition (N copies)              |
-| `...Type`  | Unbounded repetition                     |
-| `<T>`      | Generic parameter                        |
-| `<T: Tr>`  | Generic with trait constraint            |
-| `.`        | Method call / field access               |
-| `?`        | Propagate `Result` / `Option` failure    |
-| `*name`    | Private method (file-local)              |
-| `"..."`    | String literal sugar                     |
-| `mut`      | Mutable parameter                        |
+| Symbol      | Meaning                                  |
+|-------------|------------------------------------------|
+| `\|`        | Union                                    |
+| `&`         | Product                                  |
+| `Type[N]`   | Fixed repetition (N copies)              |
+| `...Type`   | Unbounded repetition                     |
+| `<T>`       | Generic parameter                        |
+| `<T: Tr>`   | Generic with trait constraint            |
+| `::<T>`     | Type argument at a call site (turbofish) |
+| `.`         | Method call / field access               |
+| `?`         | Propagate `Result` / `Option` failure    |
+| `*name`     | Private method (file-local)              |
+| `"..."`     | String literal sugar                     |
+| `mut`       | Mutable parameter                        |
+
+`::<T>` after a method name pins a generic method's type parameter when
+the compiler cannot infer it from context:
+
+```oneway
+Json.parse::<List<Int>>("[1, 2, 3]")?
+```

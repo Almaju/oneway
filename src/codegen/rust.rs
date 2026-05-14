@@ -2,14 +2,14 @@ use crate::ast::*;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 
-const SUSPENDING_CAPABILITIES: &[&str] = &["Filesystem", "Network"];
+const SUSPENDING_CAPABILITIES: &[&str] = &["Filesystem", "HttpClient", "Network"];
 
 fn is_suspending_capability(name: &str) -> bool {
     SUSPENDING_CAPABILITIES.contains(&name)
 }
 
 const CAPABILITY_TYPES: &[&str] = &[
-    "Clock", "Filesystem", "Network", "Random", "Stderr", "Stdin", "Stdout",
+    "Clock", "Filesystem", "HttpClient", "Network", "Random", "Stderr", "Stdin", "Stdout",
 ];
 
 fn is_capability_type(name: &str) -> bool {
@@ -110,6 +110,7 @@ struct Codegen {
 struct ExternMethod {
     path: String,
     is_async: bool,
+    return_ty: TypeExpr,
 }
 
 impl Codegen {
@@ -143,6 +144,7 @@ impl Codegen {
                             ExternMethod {
                                 path: extern_decl.path.clone(),
                                 is_async: extern_decl.is_async,
+                                return_ty: func.return_ty.clone(),
                             },
                         );
                     }
@@ -407,7 +409,7 @@ impl Codegen {
                         self.emit_expr(out, arg);
                     }
                     out.push(')');
-                    let recv_ty = static_type_of(receiver);
+                    let recv_ty = static_type_of_with(receiver, Some(&self.extern_methods));
                     if self.is_async_method(&recv_ty, &method.name) {
                         out.push_str(".await");
                     }
@@ -519,7 +521,7 @@ impl Codegen {
             s.push(')');
             return Some(s);
         }
-        if static_type_of(receiver) == "List" {
+        if static_type_of_with(receiver, Some(&self.extern_methods)) == "List" {
             if method.name == "length" && args.is_empty() {
                 let mut s = String::from("(");
                 self.emit_expr(&mut s, receiver);
@@ -545,7 +547,7 @@ impl Codegen {
     }
 
     fn lookup_extern_method(&self, receiver: &Expr, method: &str) -> Option<ExternMethod> {
-        let recv_ty = static_type_of(receiver);
+        let recv_ty = static_type_of_with(receiver, Some(&self.extern_methods));
         self.extern_methods
             .get(&(recv_ty, method.to_string()))
             .cloned()
@@ -726,7 +728,10 @@ fn binary_operator_for(method: &str) -> Option<&'static str> {
     }
 }
 
-fn static_type_of(expr: &Expr) -> String {
+fn static_type_of_with(
+    expr: &Expr,
+    extern_methods: Option<&HashMap<(String, String), ExternMethod>>,
+) -> String {
     match expr {
         Expr::StringLit { .. } => "String".to_string(),
         Expr::IntLit { .. } => "Int".to_string(),
@@ -737,22 +742,53 @@ fn static_type_of(expr: &Expr) -> String {
         Expr::MethodCall {
             receiver, method, ..
         } => {
-            let recv_ty = static_type_of(receiver);
-            match (recv_ty.as_str(), method.name.as_str()) {
-                ("List", "map") => "List".to_string(),
-                ("List", "length") => "Int".to_string(),
-                ("List", "first") => "Option".to_string(),
-                ("Int" | "Float", "add" | "sub" | "mul" | "div" | "rem") => recv_ty,
-                ("Int" | "Float", "eq" | "lt" | "gt" | "lte" | "gte") => "Bool".to_string(),
-                ("Bool", "not" | "and" | "or") => "Bool".to_string(),
-                ("String", "concat") => "String".to_string(),
-                _ => "<unknown>".to_string(),
+            let recv_ty = static_type_of_with(receiver, extern_methods);
+            let builtin = match (recv_ty.as_str(), method.name.as_str()) {
+                ("List", "map") => Some("List".to_string()),
+                ("List", "length") => Some("Int".to_string()),
+                ("List", "first") => Some("Option".to_string()),
+                ("Int" | "Float", "add" | "sub" | "mul" | "div" | "rem") => {
+                    Some(recv_ty.clone())
+                }
+                ("Int" | "Float", "eq" | "lt" | "gt" | "lte" | "gte") => Some("Bool".to_string()),
+                ("Bool", "not" | "and" | "or") => Some("Bool".to_string()),
+                ("String", "concat") => Some("String".to_string()),
+                _ => None,
+            };
+            if let Some(ty) = builtin {
+                return ty;
             }
+            if let Some(em) = extern_methods {
+                if let Some(method_info) = em.get(&(recv_ty.clone(), method.name.clone())) {
+                    if let Some(name) = method_info.return_ty.simple_name() {
+                        return name.to_string();
+                    }
+                }
+            }
+            "<unknown>".to_string()
         }
         Expr::Try { inner, .. } => {
             if let Expr::Constructor { name, args, .. } = &**inner {
                 if matches!(name.name.as_str(), "Ok" | "Some") && !args.is_empty() {
-                    return static_type_of(&args[0]);
+                    return static_type_of_with(&args[0], extern_methods);
+                }
+            }
+            // For a Result<T, E>?, the unwrapped type is T (the first generic).
+            if let Expr::MethodCall {
+                receiver, method, ..
+            } = &**inner
+            {
+                if let Some(em) = extern_methods {
+                    let recv_ty = static_type_of_with(receiver, extern_methods);
+                    if let Some(info) = em.get(&(recv_ty, method.name.clone())) {
+                        if let TypeExpr::Named { name, generics, .. } = &info.return_ty {
+                            if (name == "Result" || name == "Option") && !generics.is_empty() {
+                                if let Some(inner_name) = generics[0].simple_name() {
+                                    return inner_name.to_string();
+                                }
+                            }
+                        }
+                    }
                 }
             }
             "<unknown>".to_string()
@@ -810,7 +846,7 @@ fn compute_async_sets(
             if async_methods.contains(key) {
                 continue;
             }
-            if body_calls_async_oneway(body, &async_methods) {
+            if body_calls_async_oneway(body, &async_methods, extern_methods) {
                 async_methods.insert(key.clone());
                 changed = true;
             }
@@ -819,7 +855,7 @@ fn compute_async_sets(
             if async_free_fns.contains(name) {
                 continue;
             }
-            if body_calls_async_oneway(body, &async_methods) {
+            if body_calls_async_oneway(body, &async_methods, extern_methods) {
                 async_free_fns.insert(name.clone());
                 changed = true;
             }
@@ -860,7 +896,7 @@ fn expr_calls_async_extern(
             args,
             ..
         } => {
-            let recv_ty = static_type_of(receiver);
+            let recv_ty = static_type_of_with(receiver, Some(extern_methods));
             let key = (recv_ty, method.name.clone());
             if let Some(em) = extern_methods.get(&key) {
                 if em.is_async {
@@ -902,15 +938,17 @@ fn expr_calls_async_extern(
 fn body_calls_async_oneway(
     body: &Block,
     async_methods: &HashSet<(String, String)>,
+    extern_methods: &HashMap<(String, String), ExternMethod>,
 ) -> bool {
     body.exprs
         .iter()
-        .any(|e| expr_calls_async_oneway(e, async_methods))
+        .any(|e| expr_calls_async_oneway(e, async_methods, extern_methods))
 }
 
 fn expr_calls_async_oneway(
     expr: &Expr,
     async_methods: &HashSet<(String, String)>,
+    extern_methods: &HashMap<(String, String), ExternMethod>,
 ) -> bool {
     match expr {
         Expr::MethodCall {
@@ -919,39 +957,40 @@ fn expr_calls_async_oneway(
             args,
             ..
         } => {
-            let recv_ty = static_type_of(receiver);
+            let recv_ty = static_type_of_with(receiver, Some(extern_methods));
             let key = (recv_ty, method.name.clone());
             if async_methods.contains(&key) {
                 return true;
             }
-            if expr_calls_async_oneway(receiver, async_methods) {
+            if expr_calls_async_oneway(receiver, async_methods, extern_methods) {
                 return true;
             }
-            args.iter().any(|a| expr_calls_async_oneway(a, async_methods))
+            args.iter()
+                .any(|a| expr_calls_async_oneway(a, async_methods, extern_methods))
         }
-        Expr::Constructor { args, .. } => {
-            args.iter().any(|a| expr_calls_async_oneway(a, async_methods))
-        }
+        Expr::Constructor { args, .. } => args
+            .iter()
+            .any(|a| expr_calls_async_oneway(a, async_methods, extern_methods)),
         Expr::Match { scrutinee, arms, .. } => {
-            if expr_calls_async_oneway(scrutinee, async_methods) {
+            if expr_calls_async_oneway(scrutinee, async_methods, extern_methods) {
                 return true;
             }
             arms.iter()
-                .any(|arm| expr_calls_async_oneway(&arm.body, async_methods))
+                .any(|arm| expr_calls_async_oneway(&arm.body, async_methods, extern_methods))
         }
-        Expr::Try { inner, .. } => expr_calls_async_oneway(inner, async_methods),
+        Expr::Try { inner, .. } => expr_calls_async_oneway(inner, async_methods, extern_methods),
         Expr::While { cond, body, .. } => {
-            if expr_calls_async_oneway(cond, async_methods) {
+            if expr_calls_async_oneway(cond, async_methods, extern_methods) {
                 return true;
             }
             body.exprs
                 .iter()
-                .any(|e| expr_calls_async_oneway(e, async_methods))
+                .any(|e| expr_calls_async_oneway(e, async_methods, extern_methods))
         }
         Expr::Lambda { body, .. } => body
             .exprs
             .iter()
-            .any(|e| expr_calls_async_oneway(e, async_methods)),
+            .any(|e| expr_calls_async_oneway(e, async_methods, extern_methods)),
         _ => false,
     }
 }

@@ -1,4 +1,8 @@
 # Oneway Language — Development Commands
+#
+# These targets wrap `cargo run -- <subcommand>` for contributors working in
+# the repo. End users install the `oneway` binary via the install script and
+# invoke it directly (e.g. `oneway run hello.ow`).
 
 set quiet
 
@@ -13,24 +17,17 @@ build:
 release:
     cargo build --release
 
-# Run all tests
+# Run cargo tests
 test:
     cargo test
 
-# Run tests with output
+# Run cargo tests with output
 test-verbose:
     cargo test -- --nocapture
 
 # Run an .ow file (compile + execute)
 run file:
-    #!/usr/bin/env sh
-    set -e
-    cargo build --quiet 2>/dev/null
-    base="$(echo '{{file}}' | sed 's/\.ow$//')"
-    rs="${base}.rs"
-    cargo run --quiet -- --compile '{{file}}' 2>/dev/null
-    "./${base}"
-    rm -rf "${rs}" "${base}" "${base}.cargo"
+    cargo run --quiet -- run {{file}}
 
 # Run an example by name (e.g. `just example hello`, `just example multifile`)
 example name:
@@ -38,7 +35,7 @@ example name:
     set -e
     for path in "examples/{{name}}.ow" "examples/{{name}}/main.ow"; do
         if [ -f "$path" ]; then
-            exec just run "$path"
+            exec cargo run --quiet -- run "$path"
         fi
     done
     echo "No example found at examples/{{name}}.ow or examples/{{name}}/main.ow" >&2
@@ -46,23 +43,23 @@ example name:
 
 # Emit generated Rust code for an .ow file
 emit file:
-    cargo run --quiet -- --emit-rust {{file}} 2>/dev/null
+    cargo run --quiet -- emit {{file}}
 
 # Check sort order of an .ow file
 check file:
-    cargo run --quiet -- --check {{file}} 2>/dev/null
+    cargo run --quiet -- check {{file}}
 
 # Show tokens for an .ow file
 tokens file:
-    cargo run --quiet -- --tokens {{file}} 2>/dev/null
+    cargo run --quiet -- tokens {{file}}
 
 # Show AST for an .ow file
 ast file:
-    cargo run --quiet -- --ast {{file}} 2>/dev/null
+    cargo run --quiet -- ast {{file}}
 
 # Compile an .ow file to binary (no run)
 compile file:
-    cargo run --quiet -- --compile {{file}} 2>/dev/null
+    cargo run --quiet -- build {{file}}
 
 # Run all examples (continues on failure)
 examples: build
@@ -77,7 +74,7 @@ examples: build
             label=$(basename "$f" .ow)
         fi
         printf "%-20s" "$label"
-        if cargo run --quiet -- --compile "$f" 2>/dev/null; then
+        if cargo run --quiet -- build "$f" >/dev/null 2>&1; then
             output=$("./${base}" 2>&1) && {
                 echo "✓  $output"
                 pass=$((pass + 1))
@@ -106,7 +103,7 @@ emit-all: build
             label=$(basename "$f" .ow)
         fi
         echo "=== $label ==="
-        cargo run --quiet -- --emit-rust "$f" 2>/dev/null || echo "(failed to emit)"
+        cargo run --quiet -- emit "$f" 2>/dev/null || echo "(failed to emit)"
         echo ""
     done
 
@@ -121,7 +118,7 @@ check-all: build
             label=$(basename "$f" .ow)
         fi
         printf "%-20s" "$label"
-        if cargo run --quiet -- --check "$f" 2>/dev/null; then
+        if cargo run --quiet -- check "$f" >/dev/null 2>&1; then
             echo "✓"
         else
             echo "✗"

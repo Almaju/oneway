@@ -3,12 +3,12 @@ use crate::error::OnewayError;
 use std::collections::{HashMap, HashSet};
 
 const BUILTIN_TYPES: &[&str] = &[
-    "Clock", "Filesystem", "Float", "Hex", "Int", "Network", "Noop", "Off", "On", "Random",
-    "Self", "Stderr", "Stdin", "Stdout", "String",
+    "Clock", "Filesystem", "Float", "Hex", "HttpClient", "Int", "Network", "Noop", "Off", "On",
+    "Random", "Self", "Stderr", "Stdin", "Stdout", "String",
 ];
 
 const CAPABILITY_TYPES: &[&str] = &[
-    "Clock", "Filesystem", "Network", "Random", "Stderr", "Stdin", "Stdout",
+    "Clock", "Filesystem", "HttpClient", "Network", "Random", "Stderr", "Stdin", "Stdout",
 ];
 
 fn is_capability_type(name: &str) -> bool {

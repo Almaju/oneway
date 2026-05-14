@@ -3,8 +3,3 @@ IoError
 
 extern Rust.async("tokio::fs::read_to_string")
 Filesystem.read = (String) -> Result<String, IoError>
-
-main = (Filesystem, Stdout) -> Result<Noop, IoError> {
-    Filesystem.read("Cargo.toml")?.print(Stdout)
-    Ok(Noop)
-}

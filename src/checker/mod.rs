@@ -39,6 +39,8 @@ pub fn check(module: &Module) -> Vec<OnewayError> {
         }
     }
 
+    check_ordering(module, &mut errors);
+
     if !main_found {
         errors.push(OnewayError::CheckError {
             message: "no `main` entry point defined".to_string(),
@@ -47,6 +49,111 @@ pub fn check(module: &Module) -> Vec<OnewayError> {
     }
 
     errors
+}
+
+fn check_ordering(module: &Module, errors: &mut Vec<OnewayError>) {
+    // Each type def's union variants and product fields must be alphabetical.
+    for item in &module.items {
+        if let Item::TypeDef(td) = item {
+            match &td.body {
+                TypeExpr::Union { variants, .. } => {
+                    let names: Vec<(&str, crate::error::Span)> = variants
+                        .iter()
+                        .filter_map(|v| {
+                            if let TypeExpr::Named { name, span, .. } = v {
+                                Some((name.as_str(), *span))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    check_sorted_named("union variant", &names, errors);
+                }
+                TypeExpr::Product { fields, .. } => {
+                    let names: Vec<(&str, crate::error::Span)> = fields
+                        .iter()
+                        .filter_map(|f| {
+                            if let TypeExpr::Named { name, span, .. } = f {
+                                Some((name.as_str(), *span))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    check_sorted_named("product field", &names, errors);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Methods on the same receiver type must be declared alphabetically.
+    let mut methods_per_receiver: HashMap<String, Vec<(String, crate::error::Span)>> =
+        HashMap::new();
+    for item in &module.items {
+        if let Item::Function(func) = item {
+            if let Some(recv) = &func.receiver {
+                methods_per_receiver
+                    .entry(recv.name.clone())
+                    .or_default()
+                    .push((func.name.name.clone(), func.name.span));
+            }
+        }
+    }
+    for (_recv, methods) in &methods_per_receiver {
+        let pairs: Vec<(&str, crate::error::Span)> = methods
+            .iter()
+            .map(|(n, s)| (n.as_str(), *s))
+            .collect();
+        check_sorted_named("method declaration", &pairs, errors);
+    }
+
+    // `use` imports must come first and be alphabetical.
+    let mut seen_non_use = false;
+    for item in &module.items {
+        match item {
+            Item::Use(u) => {
+                if seen_non_use {
+                    errors.push(OnewayError::CheckError {
+                        message: format!(
+                            "`use {}` must appear before any type or function definitions",
+                            u.name.name
+                        ),
+                        span: u.span,
+                    });
+                }
+            }
+            _ => seen_non_use = true,
+        }
+    }
+    let use_names: Vec<(&str, crate::error::Span)> = module
+        .items
+        .iter()
+        .filter_map(|i| {
+            if let Item::Use(u) = i {
+                Some((u.name.name.as_str(), u.span))
+            } else {
+                None
+            }
+        })
+        .collect();
+    check_sorted_named("`use` import", &use_names, errors);
+}
+
+fn check_sorted_named(kind: &str, items: &[(&str, crate::error::Span)], errors: &mut Vec<OnewayError>) {
+    for window in items.windows(2) {
+        let (prev, _) = window[0];
+        let (next, span) = window[1];
+        if next < prev {
+            errors.push(OnewayError::CheckError {
+                message: format!(
+                    "{}s must be in alphabetical order — `{}` should come before `{}`",
+                    kind, next, prev
+                ),
+                span,
+            });
+        }
+    }
 }
 
 fn collect_symbols(module: &Module, errors: &mut Vec<OnewayError>) -> SymbolTable {

@@ -311,35 +311,45 @@ impl Parser {
     fn parse_expr(&mut self) -> Result<Expr> {
         let mut expr = self.parse_primary()?;
         loop {
-            if !self.check(TokenKind::Dot) {
-                break;
-            }
-            self.advance();
-            let method_tok = self.expect(TokenKind::Ident, "expected method name after `.`")?;
-            let method = Ident {
-                name: method_tok.lexeme.clone(),
-                span: method_tok.span,
-            };
-            self.expect(TokenKind::LParen, "expected `(` after method name")?;
-            let mut args = Vec::new();
-            if !self.check(TokenKind::RParen) {
-                loop {
-                    args.push(self.parse_expr()?);
-                    if self.check(TokenKind::Comma) {
-                        self.advance();
-                    } else {
-                        break;
+            if self.check(TokenKind::Dot) {
+                self.advance();
+                let method_tok =
+                    self.expect(TokenKind::Ident, "expected method name after `.`")?;
+                let method = Ident {
+                    name: method_tok.lexeme.clone(),
+                    span: method_tok.span,
+                };
+                self.expect(TokenKind::LParen, "expected `(` after method name")?;
+                let mut args = Vec::new();
+                if !self.check(TokenKind::RParen) {
+                    loop {
+                        args.push(self.parse_expr()?);
+                        if self.check(TokenKind::Comma) {
+                            self.advance();
+                        } else {
+                            break;
+                        }
                     }
                 }
+                let rparen =
+                    self.expect(TokenKind::RParen, "expected `)` to close method call")?;
+                let start_span = expr.span();
+                expr = Expr::MethodCall {
+                    receiver: Box::new(expr),
+                    method,
+                    args,
+                    span: span_join(start_span, rparen.span),
+                };
+            } else if self.check(TokenKind::Question) {
+                let q = self.advance().clone();
+                let start_span = expr.span();
+                expr = Expr::Try {
+                    inner: Box::new(expr),
+                    span: span_join(start_span, q.span),
+                };
+            } else {
+                break;
             }
-            let rparen = self.expect(TokenKind::RParen, "expected `)` to close method call")?;
-            let start_span = expr.span();
-            expr = Expr::MethodCall {
-                receiver: Box::new(expr),
-                method,
-                args,
-                span: span_join(start_span, rparen.span),
-            };
         }
         Ok(expr)
     }
@@ -467,13 +477,30 @@ impl Parser {
     fn parse_pattern(&mut self) -> Result<Pattern> {
         let tok = self.expect(TokenKind::Ident, "expected a pattern (variant name or `_`)")?;
         if tok.lexeme == "_" {
-            Ok(Pattern::Wildcard { span: tok.span })
-        } else {
-            Ok(Pattern::Variant {
-                name: tok.lexeme,
-                span: tok.span,
-            })
+            return Ok(Pattern::Wildcard { span: tok.span });
         }
+        let mut args = Vec::new();
+        let mut end_span = tok.span;
+        if self.check(TokenKind::LParen) {
+            self.advance();
+            if !self.check(TokenKind::RParen) {
+                loop {
+                    args.push(self.parse_pattern()?);
+                    if self.check(TokenKind::Comma) {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+            }
+            let rparen = self.expect(TokenKind::RParen, "expected `)` to close pattern")?;
+            end_span = rparen.span;
+        }
+        Ok(Pattern::Variant {
+            name: tok.lexeme,
+            args,
+            span: span_join(tok.span, end_span),
+        })
     }
 
     fn skip_newlines(&mut self) {

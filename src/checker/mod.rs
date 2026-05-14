@@ -48,6 +48,15 @@ fn collect_symbols(module: &Module, errors: &mut Vec<OnewayError>) -> SymbolTabl
         BUILTIN_GENERIC_TYPES.iter().map(|s| s.to_string()).collect();
     let mut variant_of: HashMap<String, String> = HashMap::new();
 
+    variant_of.insert("None".to_string(), "Option".to_string());
+    variant_of.insert("Some".to_string(), "Option".to_string());
+    variant_of.insert("Ok".to_string(), "Result".to_string());
+    variant_of.insert("Err".to_string(), "Result".to_string());
+    types.insert("None".to_string());
+    types.insert("Some".to_string());
+    types.insert("Ok".to_string());
+    types.insert("Err".to_string());
+
     for item in &module.items {
         if let Item::TypeDef(td) = item {
             let name = td.name.name.clone();
@@ -281,13 +290,14 @@ fn check_expr(
         Expr::StringLit { .. } => {}
         Expr::IntLit { .. } | Expr::FloatLit { .. } | Expr::HexLit { .. } => {}
         Expr::Constructor { name, args, span } => {
-            if !symbols.knows_type(&name.name) {
+            let is_variant = symbols.variant_of.contains_key(&name.name);
+            if !symbols.knows_type(&name.name) && !is_variant {
                 errors.push(OnewayError::CheckError {
                     message: format!("unknown type `{}` in constructor", name.name),
                     span: name.span,
                 });
             }
-            if args.is_empty() {
+            if args.is_empty() && !is_variant {
                 errors.push(OnewayError::CheckError {
                     message: format!(
                         "constructor `{}()` is not allowed — empty constructors are disallowed",
@@ -331,7 +341,12 @@ fn check_expr(
             check_expr(scrutinee, scope, symbols, errors);
             let scrutinee_ty = expr_type_name_in_scope(scrutinee, symbols);
             for arm in arms {
-                if let Pattern::Variant { name, span: pspan } = &arm.pattern {
+                if let Pattern::Variant {
+                    name,
+                    span: pspan,
+                    ..
+                } = &arm.pattern
+                {
                     let pattern_enum = symbols.variant_of.get(name);
                     if pattern_enum.map(|s| s.as_str()) != Some(scrutinee_ty.as_str())
                         && !scrutinee_ty.is_empty()
@@ -355,10 +370,16 @@ fn check_expr(
                 });
             }
         }
+        Expr::Try { inner, .. } => {
+            check_expr(inner, scope, symbols, errors);
+        }
     }
 }
 
 fn is_known_method(receiver_ty: &str, method: &str, arg_count: usize) -> bool {
+    if receiver_ty == "<unknown>" || receiver_ty == "Self" {
+        return true;
+    }
     matches!(
         (receiver_ty, method, arg_count),
         ("String", "print", 1)
@@ -381,7 +402,13 @@ fn expr_type_name_in_scope(expr: &Expr, symbols: &SymbolTable) -> String {
         Expr::IntLit { .. } => "Int".to_string(),
         Expr::FloatLit { .. } => "Float".to_string(),
         Expr::HexLit { .. } => "Hex".to_string(),
-        Expr::Constructor { name, .. } => name.name.clone(),
+        Expr::Constructor { name, .. } => {
+            if let Some(parent) = symbols.variant_of.get(&name.name) {
+                parent.clone()
+            } else {
+                name.name.clone()
+            }
+        }
         Expr::MethodCall {
             receiver, method, ..
         } => {
@@ -392,6 +419,14 @@ fn expr_type_name_in_scope(expr: &Expr, symbols: &SymbolTable) -> String {
             .first()
             .map(|arm| expr_type_name_in_scope(&arm.body, symbols))
             .unwrap_or_else(|| "<unknown>".to_string()),
+        Expr::Try { inner, .. } => {
+            if let Expr::Constructor { name, args, .. } = &**inner {
+                if matches!(name.name.as_str(), "Ok" | "Some") && !args.is_empty() {
+                    return expr_type_name_in_scope(&args[0], symbols);
+                }
+            }
+            "<unknown>".to_string()
+        }
     }
 }
 

@@ -105,8 +105,14 @@ impl Codegen {
     fn emit_function(&self, out: &mut String, func: &FunctionDef) {
         let is_entry = func.receiver.is_none() && func.name.name == "main";
         if is_entry {
-            out.push_str("fn main() {\n");
-            self.emit_block_body(out, &func.body, /* is_main */ true);
+            let ret = render_type(&func.return_ty);
+            if ret == "()" {
+                out.push_str("fn main() {\n");
+                self.emit_block_body(out, &func.body, /* main_unit */ true);
+            } else {
+                let _ = write!(out, "fn main() -> {} {{\n", ret);
+                self.emit_block_body(out, &func.body, false);
+            }
             out.push_str("}\n");
         } else {
             let _ = write!(
@@ -152,6 +158,19 @@ impl Codegen {
             Expr::Constructor { name, args, .. } => {
                 if is_primitive_constructor(&name.name) && args.len() == 1 {
                     self.emit_expr(out, &args[0]);
+                } else if is_stdlib_variant(&name.name) {
+                    if args.is_empty() {
+                        out.push_str(&name.name);
+                    } else {
+                        let _ = write!(out, "{}(", name.name);
+                        for (i, arg) in args.iter().enumerate() {
+                            if i > 0 {
+                                out.push_str(", ");
+                            }
+                            self.emit_expr(out, arg);
+                        }
+                        out.push(')');
+                    }
                 } else {
                     let _ = write!(out, "{}(", name.name);
                     for (i, arg) in args.iter().enumerate() {
@@ -198,6 +217,10 @@ impl Codegen {
                 }
                 out.push_str("    }");
             }
+            Expr::Try { inner, .. } => {
+                self.emit_expr(out, inner);
+                out.push('?');
+            }
         }
     }
 
@@ -218,8 +241,22 @@ impl Codegen {
 
     fn emit_pattern(&self, out: &mut String, pattern: &Pattern) {
         match pattern {
-            Pattern::Variant { name, .. } => {
-                out.push_str(&self.rust_value(name));
+            Pattern::Variant { name, args, .. } => {
+                if is_stdlib_variant(name) {
+                    out.push_str(name);
+                } else {
+                    out.push_str(&self.rust_value(name));
+                }
+                if !args.is_empty() {
+                    out.push('(');
+                    for (i, arg) in args.iter().enumerate() {
+                        if i > 0 {
+                            out.push_str(", ");
+                        }
+                        self.emit_pattern(out, arg);
+                    }
+                    out.push(')');
+                }
             }
             Pattern::Wildcard { .. } => {
                 out.push('_');
@@ -280,4 +317,8 @@ fn lower_first(s: &str) -> String {
 
 fn is_primitive_constructor(name: &str) -> bool {
     matches!(name, "Int" | "Float" | "Hex" | "String")
+}
+
+fn is_stdlib_variant(name: &str) -> bool {
+    matches!(name, "None" | "Some" | "Ok" | "Err")
 }

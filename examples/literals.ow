@@ -1,0 +1,3 @@
+main = (Stdout) -> Noop {
+    42.print(Stdout)
+}

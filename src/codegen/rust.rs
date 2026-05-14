@@ -140,13 +140,36 @@ impl Codegen {
             Expr::StringLit { value, .. } => {
                 let _ = write!(out, "{:?}", value);
             }
+            Expr::IntLit { value, .. } => {
+                let _ = write!(out, "{}i64", value);
+            }
+            Expr::FloatLit { value, .. } => {
+                let _ = write!(out, "{}f64", value);
+            }
+            Expr::HexLit { value, .. } => {
+                let _ = write!(out, "0x{:X}u64", value);
+            }
+            Expr::Constructor { name, args, .. } => {
+                if is_primitive_constructor(&name.name) && args.len() == 1 {
+                    self.emit_expr(out, &args[0]);
+                } else {
+                    let _ = write!(out, "{}(", name.name);
+                    for (i, arg) in args.iter().enumerate() {
+                        if i > 0 {
+                            out.push_str(", ");
+                        }
+                        self.emit_expr(out, arg);
+                    }
+                    out.push(')');
+                }
+            }
             Expr::MethodCall {
                 receiver,
                 method,
                 args,
                 ..
             } => {
-                if let Some(rust) = try_emit_builtin_method(receiver, method, args) {
+                if let Some(rust) = self.try_emit_builtin_method(receiver, method, args) {
                     out.push_str(&rust);
                 } else {
                     self.emit_expr(out, receiver);
@@ -176,6 +199,21 @@ impl Codegen {
                 out.push_str("    }");
             }
         }
+    }
+
+    fn try_emit_builtin_method(
+        &self,
+        receiver: &Expr,
+        method: &Ident,
+        args: &[Expr],
+    ) -> Option<String> {
+        if method.name == "print" && args.len() == 1 {
+            let mut s = String::from("println!(\"{}\", ");
+            self.emit_expr(&mut s, receiver);
+            s.push(')');
+            return Some(s);
+        }
+        None
     }
 
     fn emit_pattern(&self, out: &mut String, pattern: &Pattern) {
@@ -240,11 +278,6 @@ fn lower_first(s: &str) -> String {
     }
 }
 
-fn try_emit_builtin_method(receiver: &Expr, method: &Ident, args: &[Expr]) -> Option<String> {
-    if method.name == "print" && args.len() == 1 {
-        if let Expr::StringLit { value, .. } = receiver {
-            return Some(format!("println!({:?})", value));
-        }
-    }
-    None
+fn is_primitive_constructor(name: &str) -> bool {
+    matches!(name, "Int" | "Float" | "Hex" | "String")
 }

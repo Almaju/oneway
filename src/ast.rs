@@ -105,6 +105,23 @@ pub enum Expr {
         value: String,
         span: Span,
     },
+    IntLit {
+        value: i64,
+        span: Span,
+    },
+    FloatLit {
+        value: f64,
+        span: Span,
+    },
+    HexLit {
+        value: u64,
+        span: Span,
+    },
+    Constructor {
+        name: Ident,
+        args: Vec<Expr>,
+        span: Span,
+    },
     MethodCall {
         receiver: Box<Expr>,
         method: Ident,
@@ -123,6 +140,10 @@ impl Expr {
         match self {
             Expr::Ident(ident) => ident.span,
             Expr::StringLit { span, .. } => *span,
+            Expr::IntLit { span, .. } => *span,
+            Expr::FloatLit { span, .. } => *span,
+            Expr::HexLit { span, .. } => *span,
+            Expr::Constructor { span, .. } => *span,
             Expr::MethodCall { span, .. } => *span,
             Expr::Match { span, .. } => *span,
         }

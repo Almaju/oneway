@@ -350,6 +350,30 @@ impl Parser {
             TokenKind::KwMatch => self.parse_match(),
             TokenKind::Ident | TokenKind::KwSelf => {
                 self.advance();
+                if self.check(TokenKind::LParen) {
+                    self.advance();
+                    let mut args = Vec::new();
+                    if !self.check(TokenKind::RParen) {
+                        loop {
+                            args.push(self.parse_expr()?);
+                            if self.check(TokenKind::Comma) {
+                                self.advance();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                    let rparen =
+                        self.expect(TokenKind::RParen, "expected `)` to close constructor")?;
+                    return Ok(Expr::Constructor {
+                        name: Ident {
+                            name: tok.lexeme,
+                            span: tok.span,
+                        },
+                        args,
+                        span: span_join(tok.span, rparen.span),
+                    });
+                }
                 Ok(Expr::Ident(Ident {
                     name: tok.lexeme,
                     span: tok.span,
@@ -359,6 +383,42 @@ impl Parser {
                 self.advance();
                 Ok(Expr::StringLit {
                     value: tok.lexeme,
+                    span: tok.span,
+                })
+            }
+            TokenKind::IntLit => {
+                self.advance();
+                let value: i64 = tok.lexeme.parse().map_err(|_| OnewayError::ParseError {
+                    message: format!("invalid integer literal `{}`", tok.lexeme),
+                    span: tok.span,
+                })?;
+                Ok(Expr::IntLit {
+                    value,
+                    span: tok.span,
+                })
+            }
+            TokenKind::FloatLit => {
+                self.advance();
+                let value: f64 = tok.lexeme.parse().map_err(|_| OnewayError::ParseError {
+                    message: format!("invalid float literal `{}`", tok.lexeme),
+                    span: tok.span,
+                })?;
+                Ok(Expr::FloatLit {
+                    value,
+                    span: tok.span,
+                })
+            }
+            TokenKind::HexLit => {
+                self.advance();
+                let stripped = tok.lexeme.trim_start_matches("0x");
+                let value = u64::from_str_radix(stripped, 16).map_err(|_| {
+                    OnewayError::ParseError {
+                        message: format!("invalid hex literal `{}`", tok.lexeme),
+                        span: tok.span,
+                    }
+                })?;
+                Ok(Expr::HexLit {
+                    value,
                     span: tok.span,
                 })
             }

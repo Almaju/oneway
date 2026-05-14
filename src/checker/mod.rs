@@ -279,6 +279,27 @@ fn check_expr(
             }
         }
         Expr::StringLit { .. } => {}
+        Expr::IntLit { .. } | Expr::FloatLit { .. } | Expr::HexLit { .. } => {}
+        Expr::Constructor { name, args, span } => {
+            if !symbols.knows_type(&name.name) {
+                errors.push(OnewayError::CheckError {
+                    message: format!("unknown type `{}` in constructor", name.name),
+                    span: name.span,
+                });
+            }
+            if args.is_empty() {
+                errors.push(OnewayError::CheckError {
+                    message: format!(
+                        "constructor `{}()` is not allowed — empty constructors are disallowed",
+                        name.name
+                    ),
+                    span: *span,
+                });
+            }
+            for arg in args {
+                check_expr(arg, scope, symbols, errors);
+            }
+        }
         Expr::MethodCall {
             receiver,
             method,
@@ -338,7 +359,13 @@ fn check_expr(
 }
 
 fn is_known_method(receiver_ty: &str, method: &str, arg_count: usize) -> bool {
-    matches!((receiver_ty, method, arg_count), ("String", "print", 1))
+    matches!(
+        (receiver_ty, method, arg_count),
+        ("String", "print", 1)
+            | ("Int", "print", 1)
+            | ("Float", "print", 1)
+            | ("Hex", "print", 1)
+    )
 }
 
 fn expr_type_name_in_scope(expr: &Expr, symbols: &SymbolTable) -> String {
@@ -351,6 +378,10 @@ fn expr_type_name_in_scope(expr: &Expr, symbols: &SymbolTable) -> String {
             }
         }
         Expr::StringLit { .. } => "String".to_string(),
+        Expr::IntLit { .. } => "Int".to_string(),
+        Expr::FloatLit { .. } => "Float".to_string(),
+        Expr::HexLit { .. } => "Hex".to_string(),
+        Expr::Constructor { name, .. } => name.name.clone(),
         Expr::MethodCall {
             receiver, method, ..
         } => {
@@ -366,7 +397,9 @@ fn expr_type_name_in_scope(expr: &Expr, symbols: &SymbolTable) -> String {
 
 fn method_return_type(receiver_ty: &str, method: &str) -> String {
     match (receiver_ty, method) {
-        ("String", "print") => "Noop".to_string(),
+        ("String", "print") | ("Int", "print") | ("Float", "print") | ("Hex", "print") => {
+            "Noop".to_string()
+        }
         _ => "<unknown>".to_string(),
     }
 }

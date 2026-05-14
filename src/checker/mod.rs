@@ -548,13 +548,35 @@ fn is_known_method(receiver_ty: &str, method: &str, arg_count: usize) -> bool {
     if receiver_ty == "<unknown>" || receiver_ty == "Self" {
         return true;
     }
-    matches!(
+    if matches!(
         (receiver_ty, method, arg_count),
         ("String", "print", 1)
             | ("Int", "print", 1)
             | ("Float", "print", 1)
             | ("Hex", "print", 1)
-    )
+            | ("Bool", "print", 1)
+    ) {
+        return true;
+    }
+    if matches!(receiver_ty, "Int" | "Float")
+        && matches!(
+            method,
+            "add" | "sub" | "mul" | "div" | "rem" | "eq" | "lt" | "gt" | "lte" | "gte"
+        )
+        && arg_count == 1
+    {
+        return true;
+    }
+    if receiver_ty == "Bool" && matches!(method, "not") && arg_count == 0 {
+        return true;
+    }
+    if receiver_ty == "Bool" && matches!(method, "and" | "or") && arg_count == 1 {
+        return true;
+    }
+    if receiver_ty == "String" && method == "concat" && arg_count == 1 {
+        return true;
+    }
+    false
 }
 
 fn expr_type_name_in_scope(expr: &Expr, symbols: &SymbolTable) -> String {
@@ -607,9 +629,17 @@ fn expr_type_name_in_scope(expr: &Expr, symbols: &SymbolTable) -> String {
 
 fn method_return_type(receiver_ty: &str, method: &str) -> String {
     match (receiver_ty, method) {
-        ("String", "print") | ("Int", "print") | ("Float", "print") | ("Hex", "print") => {
-            "Noop".to_string()
-        }
+        ("String", "print")
+        | ("Int", "print")
+        | ("Float", "print")
+        | ("Hex", "print")
+        | ("Bool", "print") => "Noop".to_string(),
+        ("Int", "add" | "sub" | "mul" | "div" | "rem") => "Int".to_string(),
+        ("Float", "add" | "sub" | "mul" | "div" | "rem") => "Float".to_string(),
+        ("Int", "eq" | "lt" | "gt" | "lte" | "gte") => "Bool".to_string(),
+        ("Float", "eq" | "lt" | "gt" | "lte" | "gte") => "Bool".to_string(),
+        ("Bool", "not" | "and" | "or") => "Bool".to_string(),
+        ("String", "concat") => "String".to_string(),
         _ => "<unknown>".to_string(),
     }
 }

@@ -373,6 +373,30 @@ impl Codegen {
             s.push(')');
             return Some(s);
         }
+        if let Some(op) = binary_operator_for(&method.name) {
+            if args.len() == 1 {
+                let mut s = String::from("(");
+                self.emit_expr(&mut s, receiver);
+                let _ = write!(s, " {} ", op);
+                self.emit_expr(&mut s, &args[0]);
+                s.push(')');
+                return Some(s);
+            }
+        }
+        if method.name == "not" && args.is_empty() {
+            let mut s = String::from("(!");
+            self.emit_expr(&mut s, receiver);
+            s.push(')');
+            return Some(s);
+        }
+        if method.name == "concat" && args.len() == 1 {
+            let mut s = String::from("(");
+            self.emit_expr(&mut s, receiver);
+            s.push_str(" + &");
+            self.emit_expr(&mut s, &args[0]);
+            s.push(')');
+            return Some(s);
+        }
         None
     }
 
@@ -511,6 +535,24 @@ fn is_stdlib_variant(name: &str) -> bool {
 
 fn is_pascal_case(name: &str) -> bool {
     name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
+}
+
+fn binary_operator_for(method: &str) -> Option<&'static str> {
+    match method {
+        "add" => Some("+"),
+        "sub" => Some("-"),
+        "mul" => Some("*"),
+        "div" => Some("/"),
+        "rem" => Some("%"),
+        "eq" => Some("=="),
+        "lt" => Some("<"),
+        "gt" => Some(">"),
+        "lte" => Some("<="),
+        "gte" => Some(">="),
+        "and" => Some("&&"),
+        "or" => Some("||"),
+        _ => None,
+    }
 }
 
 fn static_type_of(expr: &Expr) -> String {

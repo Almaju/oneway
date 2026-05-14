@@ -8,4 +8,4 @@ description = "Oneway language support for Zed"
 [grammars.oneway]
 repository = "https://github.com/Almaju/oneway"
 path = "editors/tree-sitter-oneway"
-commit = "db44fd30cfce8ad2237ebe75c9c384d228e68689"
+commit = "8bc3a3773b0d0f3baec79ef0e4a5ebc55887214b"

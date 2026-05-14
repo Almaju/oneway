@@ -1,0 +1,9 @@
+Greeting = String
+
+Greeting.shout = () -> String {
+    "HELLO"
+}
+
+main = (Stdout) -> Noop {
+    Greeting("howdy").shout().print(Stdout)
+}

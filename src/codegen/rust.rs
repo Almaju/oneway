@@ -3,25 +3,58 @@ use std::collections::HashMap;
 use std::fmt::Write;
 
 pub fn generate(module: &Module) -> String {
-    let cg = Codegen::from_module(module);
+    let mut cg = Codegen::from_module(module);
     let mut out = String::new();
+
+    // Pass 1: emit type definitions
     for item in &module.items {
-        match item {
-            Item::Function(func) => {
-                cg.emit_function(&mut out, func);
-                out.push('\n');
-            }
-            Item::TypeDef(td) => {
-                cg.emit_type_def(&mut out, td);
-                out.push('\n');
+        if let Item::TypeDef(td) = item {
+            cg.emit_type_def(&mut out, td);
+            out.push('\n');
+        }
+    }
+
+    // Pass 2: group methods by receiver type and emit impl blocks
+    let mut methods_by_receiver: HashMap<String, Vec<&FunctionDef>> = HashMap::new();
+    let mut free_functions: Vec<&FunctionDef> = Vec::new();
+    for item in &module.items {
+        if let Item::Function(func) = item {
+            if let Some(recv) = &func.receiver {
+                methods_by_receiver
+                    .entry(recv.name.clone())
+                    .or_default()
+                    .push(func);
+            } else {
+                free_functions.push(func);
             }
         }
     }
+
+    let mut receivers: Vec<&String> = methods_by_receiver.keys().collect();
+    receivers.sort();
+    for recv in receivers {
+        let methods = methods_by_receiver.get(recv).unwrap();
+        let _ = writeln!(out, "impl {} {{", recv);
+        for func in methods {
+            cg.emit_method(&mut out, recv, func);
+            out.push('\n');
+        }
+        let _ = writeln!(out, "}}");
+        out.push('\n');
+    }
+
+    // Pass 3: emit free functions (e.g. main)
+    for func in &free_functions {
+        cg.emit_function(&mut out, func);
+        out.push('\n');
+    }
+
     out
 }
 
 struct Codegen {
     variant_of: HashMap<String, String>,
+    current_receiver: Option<String>,
 }
 
 impl Codegen {
@@ -42,7 +75,10 @@ impl Codegen {
                 }
             }
         }
-        Self { variant_of }
+        Self {
+            variant_of,
+            current_receiver: None,
+        }
     }
 
     fn emit_type_def(&self, out: &mut String, td: &TypeDef) {
@@ -78,7 +114,8 @@ impl Codegen {
             }
             TypeExpr::Named { name, generics, .. } => {
                 let rendered = render_named_type(name, generics);
-                let _ = writeln!(out, "pub type {} = {};", td.name.name, rendered);
+                let _ = writeln!(out, "#[allow(dead_code)]");
+                let _ = writeln!(out, "pub struct {}(pub {});", td.name.name, rendered);
             }
             TypeExpr::Repeat { ty, count, .. } => {
                 let _ = writeln!(
@@ -102,13 +139,14 @@ impl Codegen {
         }
     }
 
-    fn emit_function(&self, out: &mut String, func: &FunctionDef) {
+    fn emit_function(&mut self, out: &mut String, func: &FunctionDef) {
         let is_entry = func.receiver.is_none() && func.name.name == "main";
+        self.current_receiver = None;
         if is_entry {
             let ret = render_type(&func.return_ty);
             if ret == "()" {
                 out.push_str("fn main() {\n");
-                self.emit_block_body(out, &func.body, /* main_unit */ true);
+                self.emit_block_body(out, &func.body, true);
             } else {
                 let _ = write!(out, "fn main() -> {} {{\n", ret);
                 self.emit_block_body(out, &func.body, false);
@@ -126,12 +164,36 @@ impl Codegen {
         }
     }
 
-    fn emit_block_body(&self, out: &mut String, block: &Block, is_main: bool) {
+    fn emit_method(&mut self, out: &mut String, recv: &str, func: &FunctionDef) {
+        self.current_receiver = Some(recv.to_string());
+        let ret = render_type(&func.return_ty);
+        let _ = write!(out, "    pub fn {}(&self", func.name.name);
+        for (i, param) in func.params.iter().enumerate() {
+            let _ = write!(out, ", arg{}: {}", i, render_type(&param.ty));
+        }
+        let _ = write!(out, ") -> {} {{\n", ret);
+        self.emit_block_body_indented(out, &func.body, false, 2);
+        out.push_str("    }\n");
+        self.current_receiver = None;
+    }
+
+    fn emit_block_body(&self, out: &mut String, block: &Block, main_unit: bool) {
+        self.emit_block_body_indented(out, block, main_unit, 1);
+    }
+
+    fn emit_block_body_indented(
+        &self,
+        out: &mut String,
+        block: &Block,
+        main_unit: bool,
+        indent: usize,
+    ) {
+        let pad: String = std::iter::repeat("    ").take(indent).collect();
         let last_idx = block.exprs.len().saturating_sub(1);
         for (i, expr) in block.exprs.iter().enumerate() {
-            out.push_str("    ");
+            out.push_str(&pad);
             self.emit_expr(out, expr);
-            if is_main || i != last_idx {
+            if main_unit || i != last_idx {
                 out.push(';');
             }
             out.push('\n');
@@ -144,7 +206,7 @@ impl Codegen {
                 out.push_str(&self.rust_value(&ident.name));
             }
             Expr::StringLit { value, .. } => {
-                let _ = write!(out, "{:?}", value);
+                let _ = write!(out, "{:?}.to_string()", value);
             }
             Expr::IntLit { value, .. } => {
                 let _ = write!(out, "{}i64", value);
@@ -268,6 +330,14 @@ impl Codegen {
         if name == "Noop" {
             return "()".to_string();
         }
+        if name == "Self" {
+            return "self".to_string();
+        }
+        if let Some(current) = &self.current_receiver {
+            if name == current {
+                return "self".to_string();
+            }
+        }
         if let Some(parent) = self.variant_of.get(name) {
             return format!("{}::{}", parent, name);
         }
@@ -297,6 +367,7 @@ fn render_named_type(name: &str, generics: &[TypeExpr]) -> String {
         "Float" => "f64".to_string(),
         "Hex" => "u64".to_string(),
         "Bytes" => "Vec<u8>".to_string(),
+        "String" => "String".to_string(),
         other => other.to_string(),
     };
     if generics.is_empty() {

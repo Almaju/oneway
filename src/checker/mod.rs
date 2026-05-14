@@ -12,6 +12,12 @@ pub struct SymbolTable {
     pub types: HashSet<String>,
     pub generic_types: HashSet<String>,
     pub variant_of: HashMap<String, String>,
+    pub methods: HashMap<(String, String), MethodSig>,
+}
+
+pub struct MethodSig {
+    pub arity: usize,
+    pub return_ty: String,
 }
 
 impl SymbolTable {
@@ -90,10 +96,30 @@ fn collect_symbols(module: &Module, errors: &mut Vec<OnewayError>) -> SymbolTabl
         }
     }
 
+    let mut methods: HashMap<(String, String), MethodSig> = HashMap::new();
+    for item in &module.items {
+        if let Item::Function(func) = item {
+            if let Some(recv) = &func.receiver {
+                let return_ty = match &func.return_ty {
+                    TypeExpr::Named { name, .. } => name.clone(),
+                    _ => "<complex>".to_string(),
+                };
+                methods.insert(
+                    (recv.name.clone(), func.name.name.clone()),
+                    MethodSig {
+                        arity: func.params.len(),
+                        return_ty,
+                    },
+                );
+            }
+        }
+    }
+
     SymbolTable {
         types,
         generic_types,
         variant_of,
+        methods,
     }
 }
 
@@ -321,7 +347,13 @@ fn check_expr(
                 check_expr(arg, scope, symbols, errors);
             }
             let recv_ty = expr_type_name_in_scope(receiver, symbols);
-            if !is_known_method(&recv_ty, &method.name, args.len()) {
+            let known = is_known_method(&recv_ty, &method.name, args.len())
+                || symbols
+                    .methods
+                    .get(&(recv_ty.clone(), method.name.clone()))
+                    .map(|m| m.arity == args.len())
+                    .unwrap_or(false);
+            if !known {
                 errors.push(OnewayError::CheckError {
                     message: format!(
                         "no method `{}` on type `{}` with {} argument(s)",
@@ -413,6 +445,12 @@ fn expr_type_name_in_scope(expr: &Expr, symbols: &SymbolTable) -> String {
             receiver, method, ..
         } => {
             let recv_ty = expr_type_name_in_scope(receiver, symbols);
+            if let Some(sig) = symbols
+                .methods
+                .get(&(recv_ty.clone(), method.name.clone()))
+            {
+                return sig.return_ty.clone();
+            }
             method_return_type(&recv_ty, &method.name)
         }
         Expr::Match { arms, .. } => arms

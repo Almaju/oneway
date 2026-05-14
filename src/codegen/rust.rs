@@ -103,6 +103,7 @@ struct Codegen {
     bool_declared: bool,
     async_methods: HashSet<(String, String)>,
     async_free_fns: HashSet<String>,
+    types_with_self: HashSet<String>,
     lambda_scopes: std::cell::RefCell<Vec<HashMap<String, String>>>,
 }
 
@@ -175,6 +176,19 @@ impl Codegen {
 
         let (async_methods, async_free_fns) = compute_async_sets(module, &extern_methods);
 
+        let types_with_self: HashSet<String> = module
+            .items
+            .iter()
+            .filter_map(|item| {
+                if let Item::Function(func) = item {
+                    if func.name.name == "Self" {
+                        return func.receiver.as_ref().map(|r| r.name.clone());
+                    }
+                }
+                None
+            })
+            .collect();
+
         Self {
             variant_of,
             current_receiver: None,
@@ -182,6 +196,7 @@ impl Codegen {
             bool_declared,
             async_methods,
             async_free_fns,
+            types_with_self,
             lambda_scopes: std::cell::RefCell::new(Vec::new()),
         }
     }
@@ -234,11 +249,16 @@ impl Codegen {
                     );
                 } else {
                     let rendered = render_named_type(name, generics);
+                    let field_vis = if self.types_with_self.contains(&td.name.name) {
+                        ""
+                    } else {
+                        "pub "
+                    };
                     let _ = writeln!(out, "#[allow(dead_code)]");
                     let _ = writeln!(
                         out,
-                        "pub struct {}{}(pub {});",
-                        td.name.name, generic_str, rendered
+                        "pub struct {}{}({}{});",
+                        td.name.name, generic_str, field_vis, rendered
                     );
                 }
             }
@@ -314,13 +334,20 @@ impl Codegen {
             .contains(&(recv.to_string(), func.name.name.clone()));
         let async_kw = if is_async { "async " } else { "" };
         let generic_str = render_generic_params(&func.generic_params);
-        let _ = write!(
-            out,
-            "    pub {}fn {}{}(&self",
-            async_kw, func.name.name, generic_str
-        );
+        let is_self_ctor = func.name.name == "Self";
+        let emitted_name = if is_self_ctor { "r#Self" } else { func.name.name.as_str() };
+        let _ = write!(out, "    pub {}fn {}{}(", async_kw, emitted_name, generic_str);
+        let mut first = true;
+        if !is_self_ctor {
+            out.push_str("&self");
+            first = false;
+        }
         for (i, param) in func.params.iter().enumerate() {
-            let _ = write!(out, ", arg{}: {}", i, render_type(&param.ty));
+            if !first {
+                out.push_str(", ");
+            }
+            let _ = write!(out, "arg{}: {}", i, render_type(&param.ty));
+            first = false;
         }
         let _ = write!(out, ") -> {} {{\n", ret);
         self.emit_block_body_indented(out, &func.body, false, 2);
@@ -385,6 +412,32 @@ impl Codegen {
                         out.push_str(&name.name);
                     } else {
                         let _ = write!(out, "{}(", name.name);
+                        for (i, arg) in args.iter().enumerate() {
+                            if i > 0 {
+                                out.push_str(", ");
+                            }
+                            self.emit_expr(out, arg);
+                        }
+                        out.push(')');
+                    }
+                } else if self.types_with_self.contains(&name.name) {
+                    let key = (name.name.clone(), "Self".to_string());
+                    if let Some(em) = self.extern_methods.get(&key) {
+                        let path = em.path.clone();
+                        let is_async = em.is_async;
+                        let _ = write!(out, "{}(", path);
+                        for (i, arg) in args.iter().enumerate() {
+                            if i > 0 {
+                                out.push_str(", ");
+                            }
+                            self.emit_expr(out, arg);
+                        }
+                        out.push(')');
+                        if is_async {
+                            out.push_str(".await");
+                        }
+                    } else {
+                        let _ = write!(out, "{}::r#Self(", name.name);
                         for (i, arg) in args.iter().enumerate() {
                             if i > 0 {
                                 out.push_str(", ");
@@ -725,7 +778,8 @@ fn render_type(ty: &TypeExpr) -> String {
         TypeExpr::Named { name, generics, .. } => render_named_type(name, generics),
         TypeExpr::Repeat { ty, count, .. } => format!("[{}; {}]", render_type(ty), count),
         TypeExpr::Spread { ty, .. } => format!("Vec<{}>", render_type(ty)),
-        TypeExpr::Union { .. } | TypeExpr::Product { .. } => "()".to_string(),
+        TypeExpr::Union { .. } => "Box<dyn std::error::Error + Send + Sync>".to_string(),
+        TypeExpr::Product { .. } => "()".to_string(),
         TypeExpr::Function {
             params, return_ty, ..
         } => {

@@ -117,6 +117,18 @@ List.print = <T: Print>() -> Noop {
 }
 ```
 
+### Type Arguments at Call Sites
+
+Where Oneway cannot infer a generic method's type parameters from context, the caller pins them with `::<...>` after the method name (the same "turbofish" form Rust uses):
+
+```
+Json.parse::<List<Int>>("[1, 2, 3]")?
+```
+
+Reads as: call `Json.parse` with `T = List<Int>`. The `::` separator disambiguates the `<` from a comparison.
+
+Turbofish is only required when the surrounding type context is insufficient. A function with an explicit `Result<List<Int>, _>` return type, for instance, lets the compiler infer `T` from the return position without an annotation.
+
 ## Literals
 
 The language is values-only — there is no `new`, no implicit nullability, no bare keywords like `true` / `false`. Constructors are just regular functions named after the type:
@@ -185,7 +197,7 @@ A type opts into this by declaring its constructor explicitly, as a method whose
 Url = String
 
 extern Rust("oneway_url_parse")
-Url.Self = (String) -> Result<Url, UrlError>
+Url.Self = (String) -> Result<Url, InvalidUrl>
 ```
 
 `Self` is already the alias for the receiver type's name; `Type.Self` is read as "the constructor that produces a `Self`." The convention slots naturally into the existing PascalCase / camelCase rule, alongside trait implementations like `Type.Print`.
@@ -193,18 +205,22 @@ Url.Self = (String) -> Result<Url, UrlError>
 **Rules:**
 
 - If a type declares `Type.Self`, that *is* the constructor. The implicit total constructor is replaced.
-- The signature is unconstrained — total (`(String) -> Url`), fallible (`Result<Url, UrlError>`), or optional (`Option<Url>`).
+- The signature is unconstrained — total (`(String) -> Url`), fallible (`Result<Url, InvalidUrl>`), or optional (`Option<Url>`).
 - Call sites use the ordinary constructor syntax: `Url("https://example.com")`. The expression's type is whatever `Url.Self` returns, so a fallible constructor *forces* `?` (or `match`) at the call site.
 - External callers cannot bypass the constructor. Only methods declared on `Type` itself (in the same file) have access to the type's raw inner representation.
 
 ```
-main = (HttpClient & Stdout) -> Result<Noop, HttpError | UrlError> {
+main = (HttpClient & Stdout) -> Result<Noop, HttpError | InvalidUrl> {
     HttpClient.get(Url("https://example.com")?)?.print(Stdout)
     Ok(Noop)
 }
 ```
 
 This generalizes the same principle the language already applies to absence: if a value can legitimately be invalid, the fallibility belongs in the type, not in a runtime convention.
+
+#### Error Naming
+
+Errors are types like any other, and they're named *semantically* — by what failed, not by who emitted them. `InvalidUrl`, `MalformedJson`, `FileNotFound`, `PermissionDenied` carry information; `UrlError`, `JsonError`, `FsError` don't. The exception is opaque wrappers around foreign error types (e.g., `HttpError` wrapping the entire `reqwest::Error` enum) where the underlying error space hasn't been decomposed into Oneway variants yet.
 
 ## Naming Conventions
 
@@ -520,6 +536,21 @@ String.print = (Stdout) -> Noop {
 The only place to obtain real-world capabilities is `main.ow`, which receives them and threads them down. A function that does not receive a capability cannot perform the corresponding effect.
 
 This requires no new mechanism — capabilities are just types, passed as ordinary arguments — and it makes effects honest at the type level without monads or a separate effect system.
+
+### Multiple Capabilities
+
+A function that needs several capabilities receives them as a single product-typed parameter — the same `&` that composes product types elsewhere in the language:
+
+```
+main = (Filesystem & Stdout) -> Result<Noop, IoError> {
+    Filesystem.read(Path("Cargo.toml"))?.print(Stdout)
+    Ok(Noop)
+}
+```
+
+The components are accessed by their type names (`Filesystem`, `Stdout`) just like any other product-field access. The alphabetical-order rule that applies to product members also applies here: `(Filesystem & Stdout)` is valid; `(Stdout & Filesystem)` is a compile error.
+
+The product form, not a comma-separated list, is what reads correctly: `main` takes "the Filesystem capability *and* the Stdout capability" — a conjunction, which is exactly what `&` denotes.
 
 ### Suspending vs Non-Suspending Capabilities
 

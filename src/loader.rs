@@ -93,7 +93,11 @@ const STDLIB: &[StdlibEntry] = &[
     StdlibEntry {
         name: "Url",
         source: include_str!("../std/url.ow"),
-        cargo_deps: &[],
+        cargo_deps: &[CargoDep {
+            name: "url",
+            version: "2",
+            features: &[],
+        }],
         rust_prelude: Some(include_str!("../std/url.rs")),
     },
 ];

@@ -99,11 +99,7 @@ impl Parser {
 
         if self.check(TokenKind::Dot) {
             self.advance();
-            let name_tok = self.expect(TokenKind::Ident, "expected function name after `.`")?;
-            let name = Ident {
-                name: name_tok.lexeme.clone(),
-                span: name_tok.span,
-            };
+            let name = self.parse_method_name("expected function name after `.`")?;
             return self.parse_function_after_name(Some(first_ident), name, start_span);
         }
 
@@ -155,11 +151,7 @@ impl Parser {
     ) -> Result<Item> {
         if self.check(TokenKind::Dot) {
             self.advance();
-            let name_tok = self.expect(TokenKind::Ident, "expected method name after `.`")?;
-            let name = Ident {
-                name: name_tok.lexeme.clone(),
-                span: name_tok.span,
-            };
+            let name = self.parse_method_name("expected method name after `.`")?;
             self.expect(TokenKind::Eq, "expected `=` after extern method name")?;
             let generic_params = if self.check(TokenKind::Lt) {
                 self.parse_generic_params()?
@@ -758,6 +750,22 @@ impl Parser {
             self.pos += 1;
         }
         &self.tokens[self.pos - 1]
+    }
+
+    fn parse_method_name(&mut self, msg: &str) -> Result<Ident> {
+        if self.check(TokenKind::Ident) || self.check(TokenKind::KwSelf) {
+            let tok = self.advance().clone();
+            Ok(Ident {
+                name: tok.lexeme,
+                span: tok.span,
+            })
+        } else {
+            let actual = self.peek().clone();
+            Err(OnewayError::ParseError {
+                message: format!("{} (got {})", msg, actual.kind),
+                span: actual.span,
+            })
+        }
     }
 
     fn expect(&mut self, kind: TokenKind, msg: &str) -> Result<Token> {

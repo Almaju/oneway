@@ -208,6 +208,38 @@ fn collect_symbols(module: &Module, errors: &mut Vec<OnewayError>) -> SymbolTabl
     }
 }
 
+fn check_self_constructor_signature(
+    func: &FunctionDef,
+    receiver_name: &str,
+    errors: &mut Vec<OnewayError>,
+) {
+    let valid = match &func.return_ty {
+        TypeExpr::Named { name, generics, .. } => {
+            if name == receiver_name && generics.is_empty() {
+                true
+            } else if (name == "Result" || name == "Option") && !generics.is_empty() {
+                matches!(
+                    &generics[0],
+                    TypeExpr::Named { name, generics, .. }
+                        if name == receiver_name && generics.is_empty()
+                )
+            } else {
+                false
+            }
+        }
+        _ => false,
+    };
+    if !valid {
+        errors.push(OnewayError::CheckError {
+            message: format!(
+                "`{}.Self` must return `{}`, `Result<{}, E>`, or `Option<{}>`",
+                receiver_name, receiver_name, receiver_name, receiver_name
+            ),
+            span: func.return_ty.span(),
+        });
+    }
+}
+
 fn check_type_def(td: &TypeDef, symbols: &SymbolTable, errors: &mut Vec<OnewayError>) {
     let mut generic_scope: HashSet<String> = td
         .generic_params
@@ -268,6 +300,9 @@ fn check_function(
                 message: format!("unknown receiver type `{}`", recv.name),
                 span: recv.span,
             });
+        }
+        if func.name.name == "Self" {
+            check_self_constructor_signature(func, &recv.name, errors);
         }
     }
 

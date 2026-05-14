@@ -43,6 +43,26 @@ pub struct Block {
 #[derive(Debug, Clone)]
 pub enum Expr {
     Ident(Ident),
+    StringLit {
+        value: String,
+        span: Span,
+    },
+    MethodCall {
+        receiver: Box<Expr>,
+        method: Ident,
+        args: Vec<Expr>,
+        span: Span,
+    },
+}
+
+impl Expr {
+    pub fn span(&self) -> Span {
+        match self {
+            Expr::Ident(ident) => ident.span,
+            Expr::StringLit { span, .. } => *span,
+            Expr::MethodCall { span, .. } => *span,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

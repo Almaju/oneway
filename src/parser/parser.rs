@@ -130,11 +130,63 @@ impl Parser {
     }
 
     fn parse_expr(&mut self) -> Result<Expr> {
-        let tok = self.expect(TokenKind::Ident, "expected an expression")?;
-        Ok(Expr::Ident(Ident {
-            name: tok.lexeme.clone(),
-            span: tok.span,
-        }))
+        let mut expr = self.parse_primary()?;
+        loop {
+            if !self.check(TokenKind::Dot) {
+                break;
+            }
+            self.advance();
+            let method_tok = self.expect(TokenKind::Ident, "expected method name after `.`")?;
+            let method = Ident {
+                name: method_tok.lexeme.clone(),
+                span: method_tok.span,
+            };
+            self.expect(TokenKind::LParen, "expected `(` after method name")?;
+            let mut args = Vec::new();
+            if !self.check(TokenKind::RParen) {
+                loop {
+                    args.push(self.parse_expr()?);
+                    if self.check(TokenKind::Comma) {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+            }
+            let rparen = self.expect(TokenKind::RParen, "expected `)` to close method call")?;
+            let start_span = expr.span();
+            expr = Expr::MethodCall {
+                receiver: Box::new(expr),
+                method,
+                args,
+                span: span_join(start_span, rparen.span),
+            };
+        }
+        Ok(expr)
+    }
+
+    fn parse_primary(&mut self) -> Result<Expr> {
+        let tok = self.peek().clone();
+        match tok.kind {
+            TokenKind::Ident => {
+                self.advance();
+                Ok(Expr::Ident(Ident {
+                    name: tok.lexeme,
+                    span: tok.span,
+                }))
+            }
+            TokenKind::StringLit => {
+                self.advance();
+                Ok(Expr::StringLit {
+                    value: tok.lexeme,
+                    span: tok.span,
+                })
+            }
+            _ => Err(OnewayError::ParseError {
+                message: format!("expected an expression (got {})", tok.kind),
+                span: tok.span,
+            }),
+        }
     }
 
     fn skip_newlines(&mut self) {
